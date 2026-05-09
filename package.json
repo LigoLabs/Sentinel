@@ -1,0 +1,48 @@
+{
+  "name": "sentinel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted backup orchestrator for web projects: scheduled backups of databases (Turso, MySQL via SSH) and storage (Vercel Blob, SFTP) with a dashboard.",
+  "keywords": [
+    "backup",
+    "self-hosted",
+    "scheduler",
+    "turso",
+    "mysql",
+    "sftp",
+    "vercel-blob",
+    "fastify",
+    "sveltekit"
+  ],
+  "homepage": "https://github.com/LigoLabs/Sentinel#readme",
+  "bugs": {
+    "url": "https://github.com/LigoLabs/Sentinel/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LigoLabs/Sentinel.git"
+  },
+  "license": "AGPL-3.0-or-later",
+  "author": "Steven Dieu",
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
+  },
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "node scripts/kill-port.js && concurrently -n server,web -c blue,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
+    "dev:server": "npm run dev -w server",
+    "dev:web": "npm run dev -w web",
+    "build": "npm run build -w web && npm run build -w server",
+    "start": "node scripts/kill-port.js && npm run start -w server",
+    "setup": "node scripts/setup.js",
+    "prod": "npm run build && pm2 restart sentinel"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
