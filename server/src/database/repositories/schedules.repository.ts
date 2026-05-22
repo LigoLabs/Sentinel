@@ -4,22 +4,25 @@ export interface BackupSchedule {
   id: number;
   project_id: number;
   cron_expression: string;
-  retention_daily_days: number;
+  retention_count: number;
   retention_monthly: number;
+  cron_lifetime: string | null;
   is_active: number;
 }
 
 export interface CreateScheduleInput {
   project_id: number;
   cron_expression?: string;
-  retention_daily_days?: number;
+  retention_count?: number;
   retention_monthly?: boolean;
+  cron_lifetime?: string | null;
 }
 
 export interface UpdateScheduleInput {
   cron_expression?: string;
-  retention_daily_days?: number;
+  retention_count?: number;
   retention_monthly?: boolean;
+  cron_lifetime?: string | null;
   is_active?: boolean;
 }
 
@@ -45,14 +48,15 @@ export const schedulesRepo = {
     const db = getDb();
     const result = db
       .prepare(
-        `INSERT INTO backup_schedules (project_id, cron_expression, retention_daily_days, retention_monthly)
-         VALUES (?, ?, ?, ?)`,
+        `INSERT INTO backup_schedules (project_id, cron_expression, retention_count, retention_monthly, cron_lifetime)
+         VALUES (?, ?, ?, ?, ?)`,
       )
       .run(
         input.project_id,
         input.cron_expression || '0 3 * * *',
-        input.retention_daily_days ?? 15,
+        input.retention_count ?? 15,
         input.retention_monthly !== false ? 1 : 0,
+        input.cron_lifetime || null,
       );
     return db.prepare('SELECT * FROM backup_schedules WHERE id = ?').get(
       result.lastInsertRowid,
@@ -71,13 +75,18 @@ export const schedulesRepo = {
       fields.push('cron_expression = ?');
       values.push(input.cron_expression);
     }
-    if (input.retention_daily_days !== undefined) {
-      fields.push('retention_daily_days = ?');
-      values.push(input.retention_daily_days);
+    if (input.retention_count !== undefined) {
+      fields.push('retention_count = ?');
+      values.push(input.retention_count);
     }
     if (input.retention_monthly !== undefined) {
       fields.push('retention_monthly = ?');
       values.push(input.retention_monthly ? 1 : 0);
+    }
+    if (input.cron_lifetime !== undefined) {
+      const v = (input.cron_lifetime ?? '').trim();
+      fields.push('cron_lifetime = ?');
+      values.push(v ? v : null);
     }
     if (input.is_active !== undefined) {
       fields.push('is_active = ?');

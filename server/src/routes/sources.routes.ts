@@ -8,7 +8,7 @@ import { getDatabaseConnectorTypes } from '../connectors/database/registry.js';
 import { getStorageConnectorTypes } from '../connectors/storage/registry.js';
 import { sendError } from '../utils/errors.js';
 
-const DB_TYPES = new Set(['turso', 'sqlite', 'postgres', 'postgres-ssh', 'mysql', 'mysql-ssh']);
+const DB_TYPES = new Set(['turso', 'sqlite', 'postgres', 'postgres-ssh', 'mysql', 'mysql-ssh', 'wordpress']);
 
 export async function sourceRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', authenticate);

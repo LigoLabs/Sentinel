@@ -17,7 +17,7 @@ import { sendBackupAlert } from './email.service.js';
 import { updateProgress, clearProgress } from './progress.service.js';
 import { slugify } from '../utils/slug.js';
 
-const DB_CONNECTOR_TYPES = ['turso', 'sqlite', 'postgres', 'postgres-ssh', 'mysql', 'mysql-ssh'];
+const DB_CONNECTOR_TYPES = ['turso', 'sqlite', 'postgres', 'postgres-ssh', 'mysql', 'mysql-ssh', 'wordpress'];
 
 export interface BackupResult {
   backupId: number;
@@ -88,7 +88,20 @@ export async function runBackup(
     });
     try {
       const connector = getDatabaseConnector(source.type);
-      const result: DumpResult = await connector.dump(source.config, tmpDir);
+      const result: DumpResult = await connector.dump(source.config, tmpDir, (p) => {
+        // Map DumpProgress phases to BackupProgress so the existing UI handles them.
+        const mappedPhase: 'database' | 'storage' = p.phase === 'dumping' ? 'database' : 'storage';
+        updateProgress(projectId, {
+          phase: mappedPhase,
+          sourceLabel: source.label,
+          sourceType: source.type,
+          message: p.message,
+          totalFiles: p.totalFiles,
+          downloadedFiles: p.downloadedFiles,
+          currentFile: p.currentFile,
+          downloadedBytes: p.downloadedBytes,
+        });
+      });
       allLogs.push(...result.logs);
       (metadata.sources as unknown[]).push({
         id: source.id,
@@ -97,6 +110,7 @@ export async function runBackup(
         status: 'success',
         tables: result.tables,
         sizeBytes: result.sizeBytes,
+        files: result.files,
       });
       hasSuccess = true;
     } catch (err) {
@@ -236,7 +250,7 @@ export async function runBackup(
 
   const schedule = schedulesRepo.findByProject(projectId);
   if (schedule) {
-    await applyRetention(projectId, schedule.retention_daily_days);
+    await applyRetention(projectId, schedule.retention_count);
   }
 
   updateProgress(projectId, { phase: 'done', status, duration, message: 'Terminé' });

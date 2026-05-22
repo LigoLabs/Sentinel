@@ -2,6 +2,7 @@ import type { DatabaseConnector } from './types.js';
 import { TursoConnector } from './turso.js';
 import { MysqlSshConnector } from './mysql-ssh.js';
 import { PostgresSshConnector } from './postgres-ssh.js';
+import { WordPressConnector } from './wordpress.js';
 
 const connectors = new Map<string, DatabaseConnector>();
 
@@ -24,3 +25,4 @@ export function getDatabaseConnectorTypes(): string[] {
 register(new TursoConnector());
 register(new MysqlSshConnector());
 register(new PostgresSshConnector());
+register(new WordPressConnector());

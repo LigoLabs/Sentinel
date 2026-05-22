@@ -31,8 +31,9 @@
 
 	interface Schedule {
 		cron_expression: string;
-		retention_daily_days: number;
+		retention_count: number;
 		retention_monthly: number;
+		cron_lifetime: string | null;
 		is_active: number;
 	}
 
@@ -41,6 +42,7 @@
 		name: string;
 		description: string;
 		is_active: number;
+		totalSizeBytes: number;
 		schedule: Schedule | null;
 		sources: Source[];
 		backups: Backup[];
@@ -77,8 +79,9 @@
 	let pollTimer = $state<ReturnType<typeof setInterval> | null>(null);
 
 	let editCron = $state('');
-	let editRetDays = $state(15);
-	let editRetMonthly = $state(true);
+	let editRetCount = $state(15);
+	let editLifetimeEnabled = $state(true);
+	let editCronLifetime = $state('0 3 1 * *');
 	let showDeleteConfirm = $state(false);
 	let deleteLoading = $state(false);
 
@@ -89,8 +92,10 @@
 			project = await api.get<ProjectDetail>(`/projects/${projectId}`);
 			if (project?.schedule) {
 				editCron = project.schedule.cron_expression;
-				editRetDays = project.schedule.retention_daily_days;
-				editRetMonthly = !!project.schedule.retention_monthly;
+				editRetCount = project.schedule.retention_count;
+				const cl = project.schedule.cron_lifetime;
+				editLifetimeEnabled = !!(cl && cl.trim());
+				editCronLifetime = cl?.trim() || '0 3 1 * *';
 			}
 		} finally {
 			loading = false;
@@ -159,8 +164,9 @@
 			await api.put(`/projects/${projectId}`, {
 				schedule: {
 					cron_expression: editCron,
-					retention_daily_days: editRetDays,
-					retention_monthly: editRetMonthly,
+					retention_count: editRetCount,
+					retention_monthly: editLifetimeEnabled,
+					cron_lifetime: editLifetimeEnabled ? editCronLifetime : null,
 				},
 			});
 			toast.success(i18n.t('project.schedule.saved'));
@@ -250,6 +256,14 @@
 				<span class="rounded-full px-2 py-0.5 text-xs {project.is_active ? 'bg-success/15 text-success' : 'bg-surface-700 text-surface-600'}">
 					{project.is_active ? i18n.t('projects.card.active') : i18n.t('projects.card.inactive')}
 				</span>
+				{#if project.backups.length > 0}
+					<span
+						class="rounded-full bg-surface-800 px-2.5 py-0.5 font-mono text-xs text-slate-300"
+						title={i18n.t('project.history.total_disk', { size: formatBytes(project.totalSizeBytes), count: project.backups.length })}
+					>
+						{formatBytes(project.totalSizeBytes)}
+					</span>
+				{/if}
 			</div>
 			<button
 				onclick={triggerBackup}
@@ -333,41 +347,51 @@
 			</div>
 			{#if editingSchedule}
 				<div class="mt-4 space-y-4">
-					<div>
-						<label class="mb-1 block text-sm text-slate-300">{i18n.t('project.schedule.cron')}</label>
-						<input bind:value={editCron} class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
-					</div>
-					<div class="flex gap-4">
+					<!-- Disposable -->
+					<div class="rounded-lg border border-surface-700 bg-surface-800/40 p-3 space-y-2">
+						<h4 class="text-sm font-semibold text-slate-200">{i18n.t('project.schedule.disposable.title')}</h4>
 						<div>
-							<label class="mb-1 block text-sm text-slate-300">{i18n.t('project.schedule.retention_daily')}</label>
+							<label class="mb-1 block text-xs text-surface-600">{i18n.t('project.schedule.disposable.cron')}</label>
+							<input bind:value={editCron} class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
+						</div>
+						<div>
+							<label class="mb-1 block text-xs text-surface-600">{i18n.t('project.schedule.disposable.retention')}</label>
 							<div class="flex items-center gap-2">
-								<input type="number" bind:value={editRetDays} min="1" class="w-20 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-white focus:border-accent focus:outline-none" />
-								<span class="text-sm text-surface-600">{i18n.t('project.schedule.retention_unit')}</span>
+								<input type="number" bind:value={editRetCount} min="1" max="999" class="w-24 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-white focus:border-accent focus:outline-none" />
+								<span class="text-sm text-surface-600">{i18n.t('project.schedule.disposable.retention_unit')}</span>
 							</div>
 						</div>
-						<div>
-							<label class="mb-1 block text-sm text-slate-300">{i18n.t('project.schedule.retention_monthly')}</label>
-							<label class="mt-2 flex items-center gap-2">
-								<input type="checkbox" bind:checked={editRetMonthly} class="h-4 w-4 rounded" />
-								<span class="text-sm text-slate-300">{i18n.t('project.schedule.retention_monthly_check')}</span>
-							</label>
-						</div>
+					</div>
+					<!-- Lifetime -->
+					<div class="rounded-lg border border-surface-700 bg-surface-800/40 p-3 space-y-2">
+						<h4 class="text-sm font-semibold text-slate-200">{i18n.t('project.schedule.lifetime.title')}</h4>
+						<label class="flex items-center gap-2 cursor-pointer">
+							<input type="checkbox" bind:checked={editLifetimeEnabled} class="h-4 w-4 rounded accent-accent" />
+							<span class="text-sm text-slate-300">{i18n.t('project.schedule.lifetime.enable')}</span>
+						</label>
+						{#if editLifetimeEnabled}
+							<div>
+								<label class="mb-1 block text-xs text-surface-600">{i18n.t('project.schedule.lifetime.cron')}</label>
+								<input bind:value={editCronLifetime} class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
+							</div>
+						{/if}
 					</div>
 					<button onclick={saveSchedule} class="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover">
 						{i18n.t('project.schedule.save')}
 					</button>
 				</div>
 			{:else if project.schedule}
-				<div class="mt-3 flex gap-6 text-sm">
+				<div class="mt-3 space-y-1 text-sm">
 					<div>
-						<span class="text-surface-600">{i18n.t('project.schedule.summary.cron')}</span>
-						<span class="ml-1 font-mono text-white">{project.schedule.cron_expression}</span>
+						<span class="text-surface-600">{i18n.t('project.schedule.summary.disposable')}</span>
+						<span class="ml-1 text-white">{i18n.t('project.schedule.summary.disposable_value', { cron: project.schedule.cron_expression, n: project.schedule.retention_count })}</span>
 					</div>
 					<div>
-						<span class="text-surface-600">{i18n.t('project.schedule.summary.retention')}</span>
-						<span class="ml-1 text-white">{i18n.t('project.schedule.summary.daily_days', { n: project.schedule.retention_daily_days })}</span>
-						{#if project.schedule.retention_monthly}
-							<span class="ml-1 text-white">{i18n.t('project.schedule.summary.monthly_lifetime')}</span>
+						<span class="text-surface-600">{i18n.t('project.schedule.summary.lifetime')}</span>
+						{#if project.schedule.cron_lifetime}
+							<span class="ml-1 text-white">{i18n.t('project.schedule.summary.lifetime_value', { cron: project.schedule.cron_lifetime })}</span>
+						{:else}
+							<span class="ml-1 text-surface-600">{i18n.t('project.schedule.summary.lifetime_off')}</span>
 						{/if}
 					</div>
 				</div>
@@ -430,8 +454,13 @@
 
 		<!-- Backups history -->
 		<div class="rounded-xl border border-surface-700 bg-surface-900">
-			<div class="border-b border-surface-700 px-5 py-4">
+			<div class="flex items-center justify-between border-b border-surface-700 px-5 py-4">
 				<h2 class="text-lg font-semibold text-white">{i18n.t('project.history.title')}</h2>
+				{#if project.backups.length > 0}
+					<span class="text-xs text-surface-600">
+						{i18n.t('project.history.total_disk', { size: formatBytes(project.totalSizeBytes), count: project.backups.length })}
+					</span>
+				{/if}
 			</div>
 
 			{#if project.backups.length === 0}

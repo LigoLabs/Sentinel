@@ -8,16 +8,24 @@
 
 	let name = $state('');
 	let description = $state('');
-	let cronExpression = $state('0 3 * * *');
-	let retentionDays = $state(15);
-	let retentionMonthly = $state(true);
+	let cronDisposable = $state('0 3 * * *');
+	let retentionCount = $state(15);
+	let lifetimeEnabled = $state(true);
+	let cronLifetime = $state('0 3 1 * *');
 	let saving = $state(false);
 
-	const cronPresets: { key: TranslationKey; value: string }[] = [
+	const disposablePresets: { key: TranslationKey; value: string }[] = [
 		{ key: 'project.new.cron.preset.daily_3', value: '0 3 * * *' },
 		{ key: 'project.new.cron.preset.daily_midnight', value: '0 0 * * *' },
 		{ key: 'project.new.cron.preset.every_6h', value: '0 */6 * * *' },
 		{ key: 'project.new.cron.preset.every_12h', value: '0 0,12 * * *' },
+		{ key: 'project.new.cron.preset.weekly_sunday', value: '0 3 * * 0' },
+		{ key: 'project.new.cron.preset.monthly_1st', value: '0 3 1 * *' },
+	];
+
+	const lifetimePresets: { key: TranslationKey; value: string }[] = [
+		{ key: 'project.new.cron.preset.monthly_1st', value: '0 3 1 * *' },
+		{ key: 'project.new.cron.preset.yearly', value: '0 3 1 1 *' },
 	];
 
 	async function handleSubmit(e: Event) {
@@ -30,9 +38,10 @@
 				name: name.trim(),
 				description,
 				schedule: {
-					cron_expression: cronExpression,
-					retention_daily_days: retentionDays,
-					retention_monthly: retentionMonthly,
+					cron_expression: cronDisposable,
+					retention_count: retentionCount,
+					retention_monthly: lifetimeEnabled,
+					cron_lifetime: lifetimeEnabled ? cronLifetime : null,
 				},
 			});
 			toast.success(i18n.t('project.new.created', { name }));
@@ -47,7 +56,7 @@
 
 <div class="mx-auto max-w-2xl space-y-6">
 	<div class="flex items-center gap-3">
-		<a href="/projects" class="text-surface-600 hover:text-white">
+		<a href="/projects" class="text-surface-600 hover:text-white" aria-label={i18n.t('common.cancel')}>
 			<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
 			</svg>
@@ -83,53 +92,80 @@
 
 		<h3 class="text-lg font-semibold text-white">{i18n.t('project.new.section.schedule')}</h3>
 
-		<div>
-			<label for="cron" class="mb-1 block text-sm font-medium text-slate-300">{i18n.t('project.new.cron')}</label>
-			<p class="mb-2 text-xs text-surface-600">{i18n.t('project.new.cron_help')}</p>
-			<div class="flex gap-2">
-				<input
-					id="cron"
-					type="text"
-					bind:value={cronExpression}
-					class="flex-1 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-				/>
-			</div>
-			<div class="mt-2 flex flex-wrap gap-2">
-				{#each cronPresets as preset}
-					<button
-						type="button"
-						onclick={() => cronExpression = preset.value}
-						class="rounded-md px-2 py-1 text-xs transition {cronExpression === preset.value ? 'bg-accent text-white' : 'bg-surface-800 text-surface-600 hover:bg-surface-700'}"
-					>
-						{i18n.t(preset.key)}
-					</button>
-				{/each}
-			</div>
-		</div>
-
-		<div class="grid grid-cols-2 gap-4">
+		<!-- Disposable backups (retention in days) -->
+		<div class="rounded-lg border border-surface-700 bg-surface-800/40 p-4 space-y-3">
 			<div>
-				<label for="retention" class="mb-1 block text-sm font-medium text-slate-300">{i18n.t('project.new.retention_daily')}</label>
+				<h4 class="text-sm font-semibold text-slate-200">{i18n.t('project.new.disposable.title')}</h4>
+				<p class="mt-0.5 text-xs text-surface-600">{i18n.t('project.new.disposable.help')}</p>
+			</div>
+			<div>
+				<label for="cron_disp" class="mb-1 block text-xs text-surface-600">{i18n.t('project.new.disposable.cron')}</label>
+				<input
+					id="cron_disp"
+					type="text"
+					bind:value={cronDisposable}
+					class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+				/>
+				<div class="mt-2 flex flex-wrap gap-2">
+					{#each disposablePresets as preset}
+						<button
+							type="button"
+							onclick={() => cronDisposable = preset.value}
+							class="rounded-md px-2 py-1 text-xs transition {cronDisposable === preset.value ? 'bg-accent text-white' : 'bg-surface-800 text-surface-600 hover:bg-surface-700'}"
+						>
+							{i18n.t(preset.key)}
+						</button>
+					{/each}
+				</div>
+			</div>
+			<div>
+				<label for="retention" class="mb-1 block text-xs text-surface-600">{i18n.t('project.new.disposable.retention')}</label>
 				<div class="flex items-center gap-2">
 					<input
 						id="retention"
 						type="number"
-						bind:value={retentionDays}
+						bind:value={retentionCount}
 						min="1"
-						max="365"
-						class="w-20 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+						max="999"
+						class="w-24 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
 					/>
-					<span class="text-sm text-surface-600">{i18n.t('project.new.retention_daily_unit')}</span>
+					<span class="text-sm text-surface-600">{i18n.t('project.new.disposable.retention_unit')}</span>
 				</div>
 			</div>
+		</div>
 
+		<!-- Lifetime snapshots (never deleted) -->
+		<div class="rounded-lg border border-surface-700 bg-surface-800/40 p-4 space-y-3">
 			<div>
-				<label class="mb-1 block text-sm font-medium text-slate-300">{i18n.t('project.new.retention_monthly')}</label>
-				<label class="mt-2 flex items-center gap-2">
-					<input type="checkbox" bind:checked={retentionMonthly} class="h-4 w-4 rounded border-surface-700 bg-surface-800 text-accent focus:ring-accent" />
-					<span class="text-sm text-slate-300">{i18n.t('project.new.retention_monthly_check')}</span>
-				</label>
+				<h4 class="text-sm font-semibold text-slate-200">{i18n.t('project.new.lifetime.title')}</h4>
+				<p class="mt-0.5 text-xs text-surface-600">{i18n.t('project.new.lifetime.help')}</p>
 			</div>
+			<label class="flex items-center gap-2 cursor-pointer">
+				<input type="checkbox" bind:checked={lifetimeEnabled} class="h-4 w-4 rounded accent-accent" />
+				<span class="text-sm text-slate-300">{i18n.t('project.new.lifetime.enable')}</span>
+			</label>
+			{#if lifetimeEnabled}
+				<div>
+					<label for="cron_life" class="mb-1 block text-xs text-surface-600">{i18n.t('project.new.lifetime.cron')}</label>
+					<input
+						id="cron_life"
+						type="text"
+						bind:value={cronLifetime}
+						class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+					/>
+					<div class="mt-2 flex flex-wrap gap-2">
+						{#each lifetimePresets as preset}
+							<button
+								type="button"
+								onclick={() => cronLifetime = preset.value}
+								class="rounded-md px-2 py-1 text-xs transition {cronLifetime === preset.value ? 'bg-accent text-white' : 'bg-surface-800 text-surface-600 hover:bg-surface-700'}"
+							>
+								{i18n.t(preset.key)}
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
 
 		<div class="flex justify-end gap-3">

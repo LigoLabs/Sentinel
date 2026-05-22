@@ -54,14 +54,27 @@ export const backupsRepo = {
       .all(limit) as BackupWithProject[];
   },
 
-  findDailyOlderThan(projectId: number, date: string): Backup[] {
+  // Renvoie les backups disposable (type 'daily') au-delà des `keepCount` plus
+  // récents — peu importe leur statut (success/partial/failed). Si keepCount<=0,
+  // on supprime tous les daily.
+  findDailyOverLimit(projectId: number, keepCount: number): Backup[] {
+    if (keepCount <= 0) {
+      return getDb()
+        .prepare(
+          `SELECT * FROM backups
+           WHERE project_id = ? AND type = 'daily'
+           ORDER BY started_at ASC`,
+        )
+        .all(projectId) as Backup[];
+    }
     return getDb()
       .prepare(
         `SELECT * FROM backups
-         WHERE project_id = ? AND type = 'daily' AND started_at < ?
-         ORDER BY started_at ASC`,
+         WHERE project_id = ? AND type = 'daily'
+         ORDER BY started_at DESC
+         LIMIT -1 OFFSET ?`,
       )
-      .all(projectId, date) as Backup[];
+      .all(projectId, keepCount) as Backup[];
   },
 
   create(input: CreateBackupInput): Backup {
@@ -108,6 +121,26 @@ export const backupsRepo = {
       .prepare("SELECT COALESCE(SUM(size_bytes), 0) as total FROM backups WHERE status = 'success' OR status = 'partial'")
       .get() as { total: number };
     return row.total;
+  },
+
+  getTotalSizeByProject(projectId: number): number {
+    const row = getDb()
+      .prepare(
+        `SELECT COALESCE(SUM(size_bytes), 0) as total FROM backups
+         WHERE project_id = ? AND (status = 'success' OR status = 'partial')`,
+      )
+      .get(projectId) as { total: number };
+    return row.total;
+  },
+
+  getTotalSizeByAllProjects(): { project_id: number; total: number }[] {
+    return getDb()
+      .prepare(
+        `SELECT project_id, COALESCE(SUM(size_bytes), 0) as total FROM backups
+         WHERE status = 'success' OR status = 'partial'
+         GROUP BY project_id`,
+      )
+      .all() as { project_id: number; total: number }[];
   },
 
   getCount(): number {

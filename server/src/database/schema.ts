@@ -27,8 +27,9 @@ export function createSchema(db: DbLike): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       project_id INTEGER NOT NULL UNIQUE,
       cron_expression TEXT NOT NULL DEFAULT '0 3 * * *',
-      retention_daily_days INTEGER NOT NULL DEFAULT 15,
+      retention_count INTEGER NOT NULL DEFAULT 15,
       retention_monthly INTEGER NOT NULL DEFAULT 1,
+      cron_lifetime TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
@@ -73,4 +74,20 @@ export function createSchema(db: DbLike): void {
       value TEXT NOT NULL
     );
   `);
+
+  // Migrations idempotentes pour les DBs existantes. On tente chaque migration
+  // et on tolère les erreurs "no-op" :
+  //   - ADD COLUMN sur col déjà existante → "duplicate column"
+  //   - RENAME COLUMN sur col déjà renommée → "no such column"
+  for (const alter of [
+    `ALTER TABLE backup_schedules ADD COLUMN cron_lifetime TEXT`,
+    `ALTER TABLE backup_schedules RENAME COLUMN retention_daily_days TO retention_count`,
+  ]) {
+    try {
+      db.exec(alter);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/duplicate column|no such column/i.test(msg)) throw err;
+    }
+  }
 }

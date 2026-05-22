@@ -18,13 +18,9 @@ function pruneEmptyParents(filePath: string): void {
 
 export async function applyRetention(
   projectId: number,
-  retentionDailyDays: number,
+  retentionCount: number,
 ): Promise<number> {
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - retentionDailyDays);
-  const cutoff = cutoffDate.toISOString().replace('T', ' ').slice(0, 19);
-
-  const oldBackups = backupsRepo.findDailyOlderThan(projectId, cutoff);
+  const oldBackups = backupsRepo.findDailyOverLimit(projectId, retentionCount);
   let deletedCount = 0;
 
   for (const backup of oldBackups) {

@@ -18,6 +18,7 @@
 		description: string;
 		is_active: number;
 		sourcesCount: number;
+		totalSizeBytes: number;
 		schedule: { cron_expression: string; is_active: number } | null;
 		lastBackup: { id: number; status: string; started_at: string; size_bytes: number } | null;
 	}
@@ -136,6 +137,11 @@
 							{i18n.t('projects.card.no_backup')}
 						</div>
 					{/if}
+
+					<div class="mt-2 flex items-center justify-between text-xs text-surface-600">
+						<span>{i18n.t('projects.card.disk')}</span>
+						<span class="font-mono text-slate-300">{formatBytes(project.totalSizeBytes)}</span>
+					</div>
 				</a>
 			{/each}
 		</div>

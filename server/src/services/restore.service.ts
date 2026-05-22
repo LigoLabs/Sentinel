@@ -6,7 +6,7 @@ import { sourcesRepo } from '../database/repositories/sources.repository.js';
 import { getDatabaseConnector } from '../connectors/database/registry.js';
 import { getStorageConnector } from '../connectors/storage/registry.js';
 
-const DB_CONNECTOR_TYPES = ['turso', 'sqlite', 'postgres', 'postgres-ssh', 'mysql', 'mysql-ssh'];
+const DB_CONNECTOR_TYPES = ['turso', 'sqlite', 'postgres', 'postgres-ssh', 'mysql', 'mysql-ssh', 'wordpress'];
 
 export interface RestoreResult {
   success: boolean;

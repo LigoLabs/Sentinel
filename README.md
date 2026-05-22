@@ -258,7 +258,8 @@ Mot de passe par défaut : **`sentinel`** — à changer via `ADMIN_PASSWORD` da
 
 > Nécessite Node 22+ et npm 10+.
 
-## Production
+## Produ
+> Nécessite Node 22+ et npm 10+.ction
 
 ### Docker (recommandé)
 

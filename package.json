@@ -34,11 +34,13 @@
     "web"
   ],
   "scripts": {
-    "dev": "node scripts/kill-port.js && concurrently -n server,web -c blue,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
+    "predev": "node scripts/kill-port.mjs 8081 8082",
+    "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
     "build": "npm run build -w web && npm run build -w server",
-    "start": "node scripts/kill-port.js && npm run start -w server",
+    "prestart": "node scripts/kill-port.mjs 8081 8082",
+    "start": "npm run start -w server",
     "setup": "node scripts/setup.js",
     "prod": "npm run build && pm2 restart sentinel"
   },

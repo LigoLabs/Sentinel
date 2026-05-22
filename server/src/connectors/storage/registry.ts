@@ -1,6 +1,7 @@
 import type { StorageConnector } from './types.js';
 import { VercelBlobConnector } from './vercel-blob.js';
 import { SshSftpConnector } from './ssh-sftp.js';
+import { FtpConnector } from './ftp.js';
 
 const connectors = new Map<string, StorageConnector>();
 
@@ -22,3 +23,4 @@ export function getStorageConnectorTypes(): string[] {
 
 register(new VercelBlobConnector());
 register(new SshSftpConnector());
+register(new FtpConnector());

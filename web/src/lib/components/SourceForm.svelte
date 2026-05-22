@@ -59,6 +59,18 @@
 				base.pgPassword = (c.pgPassword as string) || '';
 				base.pgDatabase = (c.pgDatabase as string) || '';
 			}
+		} else if (src.type === 'ftp' || src.type === 'wordpress') {
+			base.ftpHost = (c.ftpHost as string) || '';
+			base.ftpPort = String(c.ftpPort || 21);
+			base.ftpUser = (c.ftpUser as string) || '';
+			base.ftpPassword = (c.ftpPassword as string) || '';
+			base.ftpSecure = !!c.ftpSecure;
+			if (src.type === 'ftp') {
+				base.remotePath = (c.remotePath as string) || '';
+			} else {
+				base.remoteWebRoot = (c.remoteWebRoot as string) || '';
+				base.siteUrl = (c.siteUrl as string) || '';
+			}
 		}
 		return base;
 	}
@@ -91,16 +103,26 @@
 	let pgUser = $state(init.pgUser || 'postgres');
 	let pgPassword = $state(init.pgPassword || '');
 	let pgDatabase = $state(init.pgDatabase || '');
+	let ftpHost = $state(init.ftpHost || '');
+	let ftpPort = $state(init.ftpPort || '21');
+	let ftpUser = $state(init.ftpUser || '');
+	let ftpPassword = $state(init.ftpPassword || '');
+	let ftpSecure = $state(init.ftpSecure || false);
+	let remoteWebRoot = $state(init.remoteWebRoot || '');
+	let siteUrl = $state(init.siteUrl || '');
 
 	const sourceTypes: { value: string; key: TranslationKey; category: 'database' | 'storage' }[] = [
 		{ value: 'turso', key: 'source.type.turso', category: 'database' },
 		{ value: 'mysql-ssh', key: 'source.type.mysql-ssh', category: 'database' },
 		{ value: 'postgres-ssh', key: 'source.type.postgres-ssh', category: 'database' },
+		{ value: 'wordpress', key: 'source.type.wordpress', category: 'database' },
 		{ value: 'vercel-blob', key: 'source.type.vercel-blob', category: 'storage' },
 		{ value: 'ssh-sftp', key: 'source.type.ssh-sftp', category: 'storage' },
+		{ value: 'ftp', key: 'source.type.ftp', category: 'storage' },
 	];
 
 	const needsSsh = $derived(type === 'mysql-ssh' || type === 'postgres-ssh' || type === 'ssh-sftp');
+	const needsFtp = $derived(type === 'ftp' || type === 'wordpress');
 
 	const infoWhatKey = $derived(`source.info.${type}.what` as TranslationKey);
 	const infoHowKey = $derived(`source.info.${type}.how` as TranslationKey);
@@ -111,6 +133,16 @@
 			sshPort: Number(sshPort),
 			sshUser,
 			...(sshAuthMethod === 'password' ? { sshPassword } : { sshPrivateKey }),
+		};
+	}
+
+	function getFtpConfig(): Record<string, unknown> {
+		return {
+			ftpHost,
+			ftpPort: Number(ftpPort),
+			ftpUser,
+			ftpPassword,
+			ftpSecure,
 		};
 	}
 
@@ -143,6 +175,12 @@
 				pgPassword,
 				pgDatabase,
 			};
+		}
+		if (type === 'ftp') {
+			return { ...getFtpConfig(), remotePath };
+		}
+		if (type === 'wordpress') {
+			return { ...getFtpConfig(), remoteWebRoot, siteUrl };
 		}
 		return {};
 	}
@@ -386,6 +424,66 @@
 			<span class="text-sm text-slate-300">{i18n.t('source.sftp.sudo')}</span>
 			<span class="text-xs text-surface-600">{i18n.t('source.sftp.sudo_help')}</span>
 		</label>
+	{/if}
+
+	<!-- FTP common fields (used by 'ftp' and 'wordpress') -->
+	{#if needsFtp}
+		<div class="rounded-lg border border-surface-700 bg-surface-800/50 p-4 space-y-3">
+			<h3 class="text-sm font-medium text-slate-300">{i18n.t('source.ftp.section')}</h3>
+			<div class="grid grid-cols-[1fr_auto] gap-3">
+				<div>
+					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ftp.host')}</label>
+					<input bind:value={ftpHost} placeholder={i18n.t('source.ftp.host_placeholder')} required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+				</div>
+				<div>
+					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ftp.port')}</label>
+					<input bind:value={ftpPort} type="number" class="w-24 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
+				</div>
+			</div>
+			<div class="grid grid-cols-2 gap-3">
+				<div>
+					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ftp.user')}</label>
+					<input bind:value={ftpUser} required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+				</div>
+				<div>
+					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ftp.password')}</label>
+					<input bind:value={ftpPassword} type="password" class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+				</div>
+			</div>
+			<label class="flex items-center gap-2 cursor-pointer">
+				<input type="checkbox" bind:checked={ftpSecure} class="h-4 w-4 rounded accent-accent" />
+				<span class="text-sm text-slate-300">{i18n.t('source.ftp.secure')}</span>
+				<span class="text-xs text-surface-600">{i18n.t('source.ftp.secure_help')}</span>
+			</label>
+		</div>
+	{/if}
+
+	<!-- FTP storage remote path -->
+	{#if type === 'ftp'}
+		<div>
+			<label class="mb-1 block text-sm text-slate-300">{i18n.t('source.ftp.path')}</label>
+			<input bind:value={remotePath} placeholder={i18n.t('source.ftp.path_placeholder')} required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+			<p class="mt-1 text-xs text-surface-600">
+				{i18n.t('source.ftp.path_help')}
+			</p>
+		</div>
+	{/if}
+
+	<!-- WordPress-specific fields -->
+	{#if type === 'wordpress'}
+		<div class="rounded-lg border border-surface-700 bg-surface-800/50 p-4 space-y-3">
+			<h3 class="text-sm font-medium text-slate-300">{i18n.t('source.wordpress.section')}</h3>
+			<div>
+				<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.wordpress.webroot')}</label>
+				<input bind:value={remoteWebRoot} placeholder={i18n.t('source.wordpress.webroot_placeholder')} required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+				<p class="mt-0.5 text-xs text-surface-600">{i18n.t('source.wordpress.webroot_help')}</p>
+			</div>
+			<div>
+				<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.wordpress.url')}</label>
+				<input bind:value={siteUrl} placeholder="https://example.com" required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+				<p class="mt-0.5 text-xs text-surface-600">{i18n.t('source.wordpress.url_help')}</p>
+			</div>
+		</div>
 	{/if}
 
 	<div class="flex gap-3">

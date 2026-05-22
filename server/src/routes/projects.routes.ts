@@ -16,6 +16,9 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/', async () => {
     const projects = projectsRepo.findAll();
+    const sizesByProject = new Map(
+      backupsRepo.getTotalSizeByAllProjects().map((r) => [r.project_id, r.total]),
+    );
     return projects.map((p) => {
       const schedule = schedulesRepo.findByProject(p.id);
       const sources = sourcesRepo.findByProject(p.id);
@@ -25,6 +28,7 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
         ...p,
         schedule,
         sourcesCount: sources.length,
+        totalSizeBytes: sizesByProject.get(p.id) || 0,
         lastBackup: lastBackup
           ? { id: lastBackup.id, status: lastBackup.status, started_at: lastBackup.started_at, size_bytes: lastBackup.size_bytes }
           : null,
@@ -39,14 +43,15 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
     const schedule = schedulesRepo.findByProject(project.id);
     const sources = sourcesRepo.findByProject(project.id);
     const backups = backupsRepo.findByProject(project.id, 50);
-    return { ...project, schedule, sources, backups };
+    const totalSizeBytes = backupsRepo.getTotalSizeByProject(project.id);
+    return { ...project, schedule, sources, backups, totalSizeBytes };
   });
 
   app.post<{
     Body: {
       name: string;
       description?: string;
-      schedule?: { cron_expression?: string; retention_daily_days?: number; retention_monthly?: boolean };
+      schedule?: { cron_expression?: string; retention_count?: number; retention_monthly?: boolean; cron_lifetime?: string | null };
     };
   }>('/', async (request, reply) => {
     const { name, description, schedule } = request.body;
@@ -59,8 +64,9 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
     schedulesRepo.create({
       project_id: project.id,
       cron_expression: schedule?.cron_expression,
-      retention_daily_days: schedule?.retention_daily_days,
+      retention_count: schedule?.retention_count,
       retention_monthly: schedule?.retention_monthly,
+      cron_lifetime: schedule?.cron_lifetime,
     });
 
     return reply.code(201).send(project);
@@ -72,7 +78,7 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
       name?: string;
       description?: string;
       is_active?: boolean;
-      schedule?: { cron_expression?: string; retention_daily_days?: number; retention_monthly?: boolean; is_active?: boolean };
+      schedule?: { cron_expression?: string; retention_count?: number; retention_monthly?: boolean; cron_lifetime?: string | null; is_active?: boolean };
     };
   }>('/:id', async (request, reply) => {
     const id = Number(request.params.id);
