@@ -17,11 +17,21 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
     const totalCount = backupsRepo.getCount();
     const failedCount = backupsRepo.getFailedCount(7);
 
+    // Active vs désactivé (info utile dans le hero du dashboard / liste projets)
+    const activeProjectsCount = projects.filter((p) => p.is_active).length;
+    const inactiveProjectsCount = projects.length - activeProjectsCount;
+
+    // Dernier échec sur 30 jours — utile pour afficher "dernier échec : projet X il y a 4 j"
+    const lastFailure = backupsRepo.findLastFailure(30);
+
     return {
       totalProjects: projects.length,
+      activeProjectsCount,
+      inactiveProjectsCount,
       totalBackups: totalCount,
       totalSizeBytes: totalSize,
       failedCount,
+      lastFailure,
       activeSchedules: getActiveScheduleCount(),
       recentBackups,
       nextScheduled: null,
@@ -52,6 +62,11 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Params: { id: string } }>('/alerts/:id/unread', async (request) => {
     alertsRepo.markUnread(Number(request.params.id));
+    return { success: true };
+  });
+
+  app.delete<{ Params: { id: string } }>('/alerts/:id', async (request) => {
+    alertsRepo.delete(Number(request.params.id));
     return { success: true };
   });
 

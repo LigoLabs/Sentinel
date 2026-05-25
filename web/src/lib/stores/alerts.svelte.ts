@@ -70,6 +70,15 @@ function createAlerts() {
     else await markRead(id);
   }
 
+  async function remove(id: number) {
+    try {
+      await api.delete(`/dashboard/alerts/${id}`);
+      const target = items.find((a) => a.id === id);
+      if (target && !target.is_read) unreadCount = Math.max(0, unreadCount - 1);
+      items = items.filter((a) => a.id !== id);
+    } catch { /* ignore */ }
+  }
+
   async function markAllRead() {
     try {
       await api.post('/dashboard/alerts/read-all');
@@ -97,6 +106,7 @@ function createAlerts() {
     markRead,
     markUnread,
     toggleRead,
+    remove,
     markAllRead,
     startPolling,
     stopPolling,

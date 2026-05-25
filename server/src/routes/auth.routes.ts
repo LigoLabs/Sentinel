@@ -1,10 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { verifyPassword } from '../auth/auth.service.js';
 import { check, recordFailure, recordSuccess } from '../auth/rate-limit.js';
-import { config } from '../config.js';
 import { sendError, ERROR_CODES, type ApiErrorBody } from '../utils/errors.js';
-
-const isProd = config.NODE_ENV === 'production';
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.get('/me', async (request, reply) => {
@@ -50,7 +47,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       path: '/',
       httpOnly: true,
       sameSite: 'strict',
-      secure: isProd,
+      // Secure only over real HTTPS. Tying this to NODE_ENV broke LAN access over
+      // plain HTTP (e.g. http://192.168.x.x:8082): browsers drop Secure cookies on
+      // non-HTTPS origins, so login succeeded but every later request was 401.
+      secure: request.protocol === 'https',
       maxAge: 7 * 24 * 60 * 60,
     });
     return { success: true };

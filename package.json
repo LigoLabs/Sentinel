@@ -36,15 +36,15 @@
   "scripts": {
     "predev": "node scripts/kill-port.mjs 8081 8082",
     "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
-    "dev:server": "npm run dev -w server",
-    "dev:web": "npm run dev -w web",
+    "start": "npm run dev",
     "build": "npm run build -w web && npm run build -w server",
-    "prestart": "node scripts/kill-port.mjs 8081 8082",
-    "start": "npm run start -w server",
+    "start:prod": "cross-env NODE_ENV=production npm run start -w server",
     "setup": "node scripts/setup.js",
-    "prod": "npm run build && pm2 restart sentinel"
+    "prod": "npm install && npm run build && pm2 reload sentinel --update-env",
+    "prod:update-git": "git fetch && git reset --hard origin/master && npm run prod"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "cross-env": "^10.1.0"
   }
 }

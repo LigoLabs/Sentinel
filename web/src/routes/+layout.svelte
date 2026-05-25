@@ -6,6 +6,7 @@
 	import { alerts } from '$lib/stores/alerts.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Toast from '$lib/components/Toast.svelte';
+	import IconSprite from '$lib/components/IconSprite.svelte';
 
 	let { children } = $props();
 
@@ -31,22 +32,40 @@
 <svelte:head>
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+	<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@300..600&display=swap" rel="stylesheet" />
 </svelte:head>
 
+<IconSprite />
+
 {#if !auth.checked}
-	<div class="flex h-screen items-center justify-center bg-surface-950">
+	<div class="flex h-screen items-center justify-center bg-bg">
 		<div class="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent"></div>
 	</div>
 {:else if isPublicRoute}
 	{@render children()}
 {:else if auth.authenticated}
-	<div class="flex h-screen overflow-hidden">
+	<div class="app-grid">
 		<Sidebar />
-		<main class="flex-1 overflow-y-auto p-6">
+		<main class="min-w-0">
 			{@render children()}
 		</main>
 	</div>
 {/if}
+
+<style>
+	.app-grid {
+		display: grid;
+		grid-template-columns: 248px 1fr;
+		min-height: 100vh;
+	}
+	.app-grid main {
+		padding: 1.5rem 2rem 4rem;
+	}
+	@media (max-width: 900px) {
+		.app-grid { grid-template-columns: 1fr; }
+		/* On laisse 3.5rem en haut pour que le bouton hamburger (fixed) ne masque pas le breadcrumb */
+		.app-grid main { padding: 3.75rem 1rem 3rem; }
+	}
+</style>
 
 <Toast />

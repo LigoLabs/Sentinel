@@ -58,6 +58,10 @@ export const alertsRepo = {
     getDb().prepare('UPDATE alerts SET is_read = 1 WHERE is_read = 0').run();
   },
 
+  delete(id: number): void {
+    getDb().prepare('DELETE FROM alerts WHERE id = ?').run(id);
+  },
+
   getUnreadCount(): number {
     const row = getDb()
       .prepare('SELECT COUNT(*) as count FROM alerts WHERE is_read = 0')

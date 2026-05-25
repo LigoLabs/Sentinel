@@ -1,33 +1,68 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-surface-950: oklch(0.13 0.02 260);
-  --color-surface-900: oklch(0.18 0.02 260);
-  --color-surface-800: oklch(0.23 0.02 260);
-  --color-surface-700: oklch(0.30 0.02 260);
-  --color-surface-600: oklch(0.40 0.02 260);
-  --color-accent: oklch(0.65 0.19 260);
-  --color-accent-hover: oklch(0.60 0.22 260);
-  --color-success: oklch(0.70 0.18 155);
-  --color-warning: oklch(0.75 0.15 75);
-  --color-danger: oklch(0.65 0.22 25);
+  /* Backgrounds */
+  --color-bg: #080a13;
+  --color-bg-side: #060810;
+  --color-card: #11141d;
+  --color-card-2: #161a25;
+
+  /* Borders */
+  --color-border: #1d2230;
+  --color-border-2: #2a3142;
+
+  /* Text */
+  --color-text: #e8ecf5;
+  --color-text-dim: #7a86a1;
+  --color-text-dimmer: #4d5774;
+
+  /* Brand + semantic */
+  --color-accent: #fbbf24;
+  --color-accent-2: #fcd34d;
+  --color-success: #4ade80;
+  --color-warn: #fb923c;
+  --color-danger: #f87171;
+
+  /* Accents secondaires (sources, charts) */
+  --color-cyan: #22d3ee;
+  --color-violet: #a78bfa;
+  --color-purple: #a855f7;
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: var(--color-surface-950);
-  color: #e2e8f0;
+  font-family: 'Geist', system-ui, -apple-system, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-surface-900);
+  background: var(--color-bg-side);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-surface-600);
-  border-radius: 3px;
+  background: var(--color-border-2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-dimmer);
+}
+
+/* Police mono utilisée pour les chiffres, codes, badges */
+.font-mono,
+code,
+pre,
+.tabular {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Petit helper utilisé par plusieurs pages pour les chiffres alignés */
+.tnum {
+  font-feature-settings: 'tnum';
 }

@@ -6,6 +6,7 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { i18n } from '$lib/i18n/index.svelte';
 	import { translateError } from '$lib/i18n/errors';
+	import { formatBytes } from '$lib/utils/format';
 	import type { TranslationKey } from '$lib/i18n/dict';
 
 	interface DashboardStats {
@@ -32,12 +33,12 @@
 
 	type Tab = 'general' | 'notifications' | 'monitoring' | 'security' | 'advanced';
 
-	const TABS: { id: Tab; key: TranslationKey }[] = [
-		{ id: 'general', key: 'settings.tab.general' },
-		{ id: 'notifications', key: 'settings.tab.notifications' },
-		{ id: 'monitoring', key: 'settings.tab.monitoring' },
-		{ id: 'security', key: 'settings.tab.security' },
-		{ id: 'advanced', key: 'settings.tab.advanced' },
+	const TABS: { id: Tab; key: TranslationKey; icon: string }[] = [
+		{ id: 'general', key: 'settings.tab.general', icon: 'i-activity' },
+		{ id: 'notifications', key: 'settings.tab.notifications', icon: 'i-mail' },
+		{ id: 'monitoring', key: 'settings.tab.monitoring', icon: 'i-bell' },
+		{ id: 'security', key: 'settings.tab.security', icon: 'i-shield' },
+		{ id: 'advanced', key: 'settings.tab.advanced', icon: 'i-terminal' },
 	];
 	const TAB_IDS = TABS.map((t) => t.id);
 	const DEFAULT_TAB: Tab = 'general';
@@ -57,6 +58,7 @@
 			keepFocus: true,
 		});
 	}
+
 	let stats = $state<DashboardStats | null>(null);
 	let tmp = $state<TmpStatus | null>(null);
 	let cleaningTmp = $state(false);
@@ -71,7 +73,6 @@
 		return envKeys.find((e) => e.key === k)?.isSet ?? false;
 	}
 
-	// SMTP form state
 	let smtpEnabled = $state(false);
 	let smtpHost = $state('');
 	let smtpPort = $state('465');
@@ -87,7 +88,6 @@
 	let testingSmtp = $state(false);
 	let smtpTestResult = $state<{ success: boolean; message: string } | null>(null);
 
-	// Monitoring
 	let healthchecksUrl = $state('');
 	let healthchecksDirty = $state(false);
 	let healthchecksSaving = $state(false);
@@ -201,300 +201,583 @@
 		}
 	}
 
-	function formatBytes(bytes: number): string {
-		if (bytes === 0) return '0 B';
-		const k = 1024;
-		const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-		const i = Math.floor(Math.log(bytes) / Math.log(k));
-		return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-	}
-
 	function categoryLabel(cat: 'editable' | 'readonly' | 'secret'): string {
 		return i18n.t(`settings.advanced.cat.${cat}` as TranslationKey);
 	}
-
-	function categoryColor(cat: 'editable' | 'readonly' | 'secret'): string {
-		if (cat === 'editable') return 'bg-success/15 text-success';
-		if (cat === 'secret') return 'bg-danger/15 text-danger';
-		return 'bg-surface-700 text-surface-500';
-	}
 </script>
 
-<div class="mx-auto max-w-3xl space-y-6">
-	<h1 class="text-2xl font-bold text-white">{i18n.t('settings.title')}</h1>
+<!-- Topbar -->
+<div class="topbar">
+	<div class="crumbs">
+		<a href="/">Sentinel</a>
+		<span class="sep">/</span>
+		<b>{i18n.t('settings.title')}</b>
+	</div>
+</div>
 
-	<!-- Tab nav -->
-	<nav class="flex flex-wrap gap-1 border-b border-surface-700">
-		{#each TABS as tab}
-			<button
-				onclick={() => setTab(tab.id)}
-				class="-mb-px cursor-pointer border-b-2 px-3 py-2 text-sm transition {activeTab === tab.id
-					? 'border-accent text-accent'
-					: 'border-transparent text-surface-500 hover:text-slate-300'}"
-			>
-				{i18n.t(tab.key)}
-			</button>
-		{/each}
-	</nav>
+<!-- Hero -->
+<div class="hero">
+	<h1>{i18n.t('settings.title')}</h1>
+	<p>{i18n.t('settings.hero_help')}</p>
+</div>
 
+<!-- Tab nav -->
+<nav class="tabs">
+	{#each TABS as tab}
+		<button class="tab" class:active={activeTab === tab.id} onclick={() => setTab(tab.id)}>
+			<svg class="icn"><use href="#{tab.icon}" /></svg>
+			{i18n.t(tab.key)}
+		</button>
+	{/each}
+</nav>
+
+<div class="content">
 	<!-- ============ GENERAL ============ -->
 	{#if activeTab === 'general'}
 		{#if stats}
-			<div class="rounded-xl border border-surface-700 bg-surface-900 p-5">
-				<h2 class="text-lg font-semibold text-white">{i18n.t('settings.stats.title')}</h2>
-				<div class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
-					<div>
-						<p class="text-sm text-surface-600">{i18n.t('settings.stats.projects')}</p>
-						<p class="text-xl font-bold text-white">{stats.totalProjects}</p>
-					</div>
-					<div>
-						<p class="text-sm text-surface-600">{i18n.t('settings.stats.backups')}</p>
-						<p class="text-xl font-bold text-white">{stats.totalBackups}</p>
-					</div>
-					<div>
-						<p class="text-sm text-surface-600">{i18n.t('settings.stats.disk')}</p>
-						<p class="text-xl font-bold text-white">{formatBytes(stats.totalSizeBytes)}</p>
-					</div>
-					<div>
-						<p class="text-sm text-surface-600">{i18n.t('settings.stats.schedules')}</p>
-						<p class="text-xl font-bold text-white">{stats.activeSchedules}</p>
-					</div>
-					<div>
-						<p class="text-sm text-surface-600">{i18n.t('settings.stats.failures')}</p>
-						<p class="text-xl font-bold" class:text-danger={stats.failedCount > 0} class:text-success={stats.failedCount === 0}>
-							{stats.failedCount}
-						</p>
+			<div class="card">
+				<div class="card-head"><div class="card-title">{i18n.t('settings.stats.title')}</div></div>
+				<div class="card-body">
+					<div class="stats-grid">
+						<div class="stat-cell">
+							<div class="stat-label">{i18n.t('settings.stats.projects')}</div>
+							<div class="stat-val">{stats.totalProjects}</div>
+						</div>
+						<div class="stat-cell">
+							<div class="stat-label">{i18n.t('settings.stats.backups')}</div>
+							<div class="stat-val">{stats.totalBackups}</div>
+						</div>
+						<div class="stat-cell">
+							<div class="stat-label">{i18n.t('settings.stats.disk')}</div>
+							<div class="stat-val">{formatBytes(stats.totalSizeBytes)}</div>
+						</div>
+						<div class="stat-cell">
+							<div class="stat-label">{i18n.t('settings.stats.schedules')}</div>
+							<div class="stat-val">{stats.activeSchedules}</div>
+						</div>
+						<div class="stat-cell">
+							<div class="stat-label">{i18n.t('settings.stats.failures')}</div>
+							<div class="stat-val" class:warn={stats.failedCount > 0} class:ok={stats.failedCount === 0}>
+								{stats.failedCount}
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
 		{/if}
 
-		<div class="rounded-xl border border-surface-700 bg-surface-900 p-5">
-			<h2 class="text-lg font-semibold text-white">{i18n.t('settings.tmp.title')}</h2>
-			{#if tmp}
-				<div class="mt-4 flex items-center justify-between">
-					<div class="text-sm">
-						{#if tmp.count === 0}
-							<span class="text-success">{i18n.t('settings.tmp.empty')}</span>
-						{:else}
-							<span class="text-warning">{i18n.tn('settings.tmp.count', tmp.count)}</span>
-							<span class="ml-2 text-surface-600">({formatBytes(tmp.totalSizeBytes)})</span>
-						{/if}
-					</div>
-					{#if tmp.count > 0}
-						<button onclick={cleanupTmp} disabled={cleaningTmp} class="rounded-lg bg-warning/20 px-4 py-2 text-sm text-warning transition hover:bg-warning/30 disabled:opacity-50">
-							{cleaningTmp ? i18n.t('settings.tmp.cleaning') : i18n.t('settings.tmp.cleanup')}
-						</button>
+		<div class="card">
+			<div class="card-head"><div class="card-title">{i18n.t('settings.tmp.title')}</div></div>
+			<div class="card-body">
+				{#if tmp}
+					{#if tmp.count === 0}
+						<div class="tmp-row ok">
+							<div class="tmp-left">
+								<svg class="icn" style="color:var(--color-success)"><use href="#i-check" /></svg>
+								<span class="ok">{i18n.t('settings.tmp.empty')}</span>
+							</div>
+						</div>
+					{:else}
+						<div class="tmp-row warn">
+							<div class="tmp-left">
+								<svg class="icn" style="color:var(--color-warn)"><use href="#i-warning" /></svg>
+								<span class="warn">{i18n.tn('settings.tmp.count', tmp.count)}</span>
+								<span class="size">({formatBytes(tmp.totalSizeBytes)})</span>
+							</div>
+							<button class="btn warn-btn" onclick={cleanupTmp} disabled={cleaningTmp}>
+								{cleaningTmp ? i18n.t('settings.tmp.cleaning') : i18n.t('settings.tmp.cleanup')}
+							</button>
+						</div>
 					{/if}
-				</div>
-				<p class="mt-2 text-xs text-surface-600">{i18n.t('settings.tmp.help')}</p>
-			{/if}
+					<p class="help">{i18n.t('settings.tmp.help')}</p>
+				{/if}
+			</div>
 		</div>
 	{/if}
 
 	<!-- ============ NOTIFICATIONS ============ -->
 	{#if activeTab === 'notifications'}
-		<div class="rounded-xl border border-surface-700 bg-surface-900 p-5">
-			<div class="flex items-start justify-between">
+		<div class="card">
+			<div class="card-head">
 				<div>
-					<h2 class="text-lg font-semibold text-white">{i18n.t('settings.smtp.title')}</h2>
-					<p class="mt-1 text-sm text-surface-600">{i18n.t('settings.smtp.subtitle')}</p>
+					<div class="card-title">{i18n.t('settings.smtp.title')}</div>
+					<p class="card-help">{i18n.t('settings.smtp.subtitle')}</p>
 				</div>
-				<label class="flex items-center gap-2 cursor-pointer">
-					<input type="checkbox" bind:checked={smtpEnabled} onchange={() => (smtpDirty = true)} class="h-4 w-4 rounded accent-accent" />
-					<span class="text-sm text-slate-300">{i18n.t('settings.smtp.enabled')}</span>
+				<label class="toggle-line inline">
+					<input type="checkbox" bind:checked={smtpEnabled} onchange={() => (smtpDirty = true)} />
+					<span>{i18n.t('settings.smtp.enabled')}</span>
 				</label>
 			</div>
 
-			<div class="mt-5 grid gap-4 sm:grid-cols-[1fr_auto]">
-				<div>
-					<label class="mb-1 block text-xs text-surface-500">{i18n.t('settings.smtp.host')}</label>
-					<input type="text" bind:value={smtpHost} oninput={() => (smtpDirty = true)} placeholder={i18n.t('settings.smtp.host_placeholder')} class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+			<div class="card-body">
+				<div class="grid-2">
+					<div class="field">
+						<label for="smtp-host">{i18n.t('settings.smtp.host')}</label>
+						<input id="smtp-host" type="text" class="mono" bind:value={smtpHost} oninput={() => (smtpDirty = true)} placeholder={i18n.t('settings.smtp.host_placeholder')} />
+					</div>
+					<div class="field">
+						<label for="smtp-port">{i18n.t('settings.smtp.port')}</label>
+						<input id="smtp-port" type="number" class="mono" bind:value={smtpPort} oninput={() => (smtpDirty = true)} />
+					</div>
 				</div>
-				<div>
-					<label class="mb-1 block text-xs text-surface-500">{i18n.t('settings.smtp.port')}</label>
-					<input type="number" bind:value={smtpPort} oninput={() => (smtpDirty = true)} class="w-24 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
-				</div>
-			</div>
 
-			<label class="mt-4 flex items-center gap-2 cursor-pointer">
-				<input type="checkbox" bind:checked={smtpSecure} onchange={() => (smtpDirty = true)} class="h-4 w-4 rounded accent-accent" />
-				<span class="text-sm text-slate-300">{i18n.t('settings.smtp.secure')}</span>
-				<span class="text-xs text-surface-500">{i18n.t('settings.smtp.secure_help')}</span>
-			</label>
+				<label class="toggle-line">
+					<input type="checkbox" bind:checked={smtpSecure} onchange={() => (smtpDirty = true)} />
+					<span>{i18n.t('settings.smtp.secure')}</span>
+					<small>{i18n.t('settings.smtp.secure_help')}</small>
+				</label>
 
-			<div class="mt-4 grid gap-4 sm:grid-cols-2">
-				<div>
-					<label class="mb-1 block text-xs text-surface-500">{i18n.t('settings.smtp.user')}</label>
-					<input type="text" bind:value={smtpUser} oninput={() => (smtpDirty = true)} class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
+				<div class="grid-2">
+					<div class="field">
+						<label for="smtp-user">{i18n.t('settings.smtp.user')}</label>
+						<input id="smtp-user" type="text" class="mono" bind:value={smtpUser} oninput={() => (smtpDirty = true)} />
+					</div>
+					<div class="field">
+						<label for="smtp-pass">{i18n.t('settings.smtp.pass')}</label>
+						<input id="smtp-pass" type="password" class="mono" bind:value={smtpPass} oninput={() => { smtpDirty = true; smtpPassChanged = true; }} placeholder={envIsSet('SMTP_PASS') ? '••••••••' : ''} />
+					</div>
 				</div>
-				<div>
-					<label class="mb-1 block text-xs text-surface-500">{i18n.t('settings.smtp.pass')}</label>
-					<input type="password" bind:value={smtpPass} oninput={() => { smtpDirty = true; smtpPassChanged = true; }} placeholder={envIsSet('SMTP_PASS') ? '••••••••' : ''} class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
-				</div>
-			</div>
 
-			<div class="mt-4 grid gap-4 sm:grid-cols-2">
-				<div>
-					<label class="mb-1 block text-xs text-surface-500">{i18n.t('settings.smtp.from')}</label>
-					<input type="email" bind:value={smtpFrom} oninput={() => (smtpDirty = true)} placeholder={i18n.t('settings.smtp.from_placeholder')} class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+				<div class="grid-2">
+					<div class="field">
+						<label for="smtp-from">{i18n.t('settings.smtp.from')}</label>
+						<input id="smtp-from" type="email" class="mono" bind:value={smtpFrom} oninput={() => (smtpDirty = true)} placeholder={i18n.t('settings.smtp.from_placeholder')} />
+					</div>
+					<div class="field">
+						<label for="smtp-from-name">{i18n.t('settings.smtp.from_name')}</label>
+						<input id="smtp-from-name" type="text" bind:value={smtpFromName} oninput={() => (smtpDirty = true)} placeholder={i18n.t('settings.smtp.from_name_placeholder')} />
+					</div>
 				</div>
-				<div>
-					<label class="mb-1 block text-xs text-surface-500">{i18n.t('settings.smtp.from_name')}</label>
-					<input type="text" bind:value={smtpFromName} oninput={() => (smtpDirty = true)} placeholder={i18n.t('settings.smtp.from_name_placeholder')} class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+
+				<div class="field">
+					<label for="alert-email">{i18n.t('settings.smtp.alert_email')}</label>
+					<input id="alert-email" type="email" class="mono" bind:value={alertEmail} oninput={() => (smtpDirty = true)} placeholder={i18n.t('settings.smtp.alert_email_placeholder')} />
 				</div>
-			</div>
 
-			<div class="mt-4">
-				<label class="mb-1 block text-xs text-surface-500">{i18n.t('settings.smtp.alert_email')}</label>
-				<input type="email" bind:value={alertEmail} oninput={() => (smtpDirty = true)} placeholder={i18n.t('settings.smtp.alert_email_placeholder')} class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
-			</div>
-
-			<div class="mt-5 flex flex-wrap items-center gap-3">
-				<button onclick={saveSmtp} disabled={!smtpDirty || smtpSaving} class="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent-hover disabled:opacity-50">
-					{smtpSaving ? i18n.t('settings.saving') : i18n.t('settings.save')}
-				</button>
-				<button onclick={testSmtp} disabled={testingSmtp || !smtpEnabled || smtpDirty} class="rounded-lg border border-surface-700 px-4 py-2 text-sm text-slate-300 transition hover:bg-surface-800 disabled:opacity-50">
-					{testingSmtp ? i18n.t('settings.smtp.testing') : i18n.t('settings.smtp.test')}
-				</button>
-				{#if smtpTestResult}
-					<span class="text-sm" class:text-success={smtpTestResult.success} class:text-danger={!smtpTestResult.success}>
-						{smtpTestResult.message}
-					</span>
-				{/if}
+				<div class="actions">
+					<button class="btn primary" onclick={saveSmtp} disabled={!smtpDirty || smtpSaving}>
+						{smtpSaving ? i18n.t('settings.saving') : i18n.t('settings.save')}
+					</button>
+					<button class="btn" onclick={testSmtp} disabled={testingSmtp || !smtpEnabled || smtpDirty}>
+						{testingSmtp ? i18n.t('settings.smtp.testing') : i18n.t('settings.smtp.test')}
+					</button>
+					{#if smtpTestResult}
+						<span class:text-success={smtpTestResult.success} class:text-danger={!smtpTestResult.success} class="test-result">
+							{smtpTestResult.message}
+						</span>
+					{/if}
+				</div>
 			</div>
 		</div>
 	{/if}
 
 	<!-- ============ MONITORING ============ -->
 	{#if activeTab === 'monitoring'}
-		<div class="rounded-xl border border-surface-700 bg-surface-900 p-5">
-			<h2 class="text-lg font-semibold text-white">{i18n.t('settings.monitoring.title')}</h2>
-			<p class="mt-1 text-sm text-surface-600">{i18n.t('settings.monitoring.subtitle')}</p>
-
-			<div class="mt-4 flex items-center gap-2 text-sm">
-				<span class="inline-flex h-2 w-2 rounded-full {envIsSet('HEALTHCHECKS_PING_URL') ? 'bg-success' : 'bg-surface-600'}"></span>
-				<span class={envIsSet('HEALTHCHECKS_PING_URL') ? 'text-success' : 'text-surface-600'}>
-					{envIsSet('HEALTHCHECKS_PING_URL') ? i18n.t('settings.monitoring.status_active') : i18n.t('settings.monitoring.status_inactive')}
-				</span>
+		<div class="card">
+			<div class="card-head">
+				<div>
+					<div class="card-title">{i18n.t('settings.monitoring.title')}</div>
+					<p class="card-help">{i18n.t('settings.monitoring.subtitle')}</p>
+				</div>
 			</div>
+			<div class="card-body">
+				<div class="status-line" class:ok={envIsSet('HEALTHCHECKS_PING_URL')}>
+					<span class="dot"></span>
+					<span>
+						{envIsSet('HEALTHCHECKS_PING_URL')
+							? i18n.t('settings.monitoring.status_active')
+							: i18n.t('settings.monitoring.status_inactive')}
+					</span>
+				</div>
 
-			<div class="mt-4">
-				<label class="mb-1 block text-xs text-surface-500">{i18n.t('settings.monitoring.url')}</label>
-				<input type="url" bind:value={healthchecksUrl} oninput={() => (healthchecksDirty = true)} placeholder={i18n.t('settings.monitoring.url_placeholder')} class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
-				<p class="mt-1 text-xs text-surface-600">
-					{@html i18n.t('settings.monitoring.url_help', {
-						service: '<a href="https://healthchecks.io" target="_blank" class="text-accent hover:underline">Healthchecks.io</a>',
-					})}
-				</p>
-			</div>
+				<div class="field">
+					<label for="hc-url">{i18n.t('settings.monitoring.url')}</label>
+					<input id="hc-url" type="url" class="mono" bind:value={healthchecksUrl} oninput={() => (healthchecksDirty = true)} placeholder={i18n.t('settings.monitoring.url_placeholder')} />
+					<p class="field-help">
+						{@html i18n.t('settings.monitoring.url_help', {
+							service: '<a href="https://healthchecks.io" target="_blank" rel="noopener" class="link-accent">Healthchecks.io</a>',
+						})}
+					</p>
+				</div>
 
-			<button onclick={saveHealthchecks} disabled={!healthchecksDirty || healthchecksSaving} class="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent-hover disabled:opacity-50">
-				{healthchecksSaving ? i18n.t('settings.saving') : i18n.t('settings.save')}
-			</button>
+				<div class="actions">
+					<button class="btn primary" onclick={saveHealthchecks} disabled={!healthchecksDirty || healthchecksSaving}>
+						{healthchecksSaving ? i18n.t('settings.saving') : i18n.t('settings.save')}
+					</button>
+				</div>
 
-			<div class="mt-5 rounded-lg border border-accent/20 bg-accent/5 p-4">
-				<p class="text-xs leading-relaxed text-surface-400">{i18n.t('settings.monitoring.how')}</p>
+				<div class="info-box">
+					<p>{i18n.t('settings.monitoring.how')}</p>
+				</div>
 			</div>
 		</div>
 	{/if}
 
 	<!-- ============ SECURITY ============ -->
 	{#if activeTab === 'security'}
-		<div class="rounded-xl border border-surface-700 bg-surface-900 p-5">
-			<h2 class="text-lg font-semibold text-white">{i18n.t('settings.security.password.title')}</h2>
-			<p class="mt-1 text-sm text-surface-600">{i18n.t('settings.security.password.help')}</p>
-			<p class="mt-3 rounded-md bg-surface-800 px-3 py-2 text-xs text-surface-400">
-				{@html i18n.t('settings.security.password.env_only', {
-					var: '<code class="rounded bg-surface-950 px-1 py-0.5 font-mono text-accent">ADMIN_PASSWORD</code>',
-					envFile: '<code class="rounded bg-surface-950 px-1 py-0.5 font-mono text-accent">.env</code>',
-				})}
-			</p>
-			<div class="mt-4 flex items-center justify-between rounded-lg bg-surface-800 px-4 py-3">
-				<div>
-					<p class="text-sm text-slate-300">{i18n.t('settings.security.password.title')}</p>
-					<p class="font-mono text-xs text-surface-600">ADMIN_PASSWORD</p>
+		<div class="card">
+			<div class="card-head"><div>
+				<div class="card-title">{i18n.t('settings.security.password.title')}</div>
+				<p class="card-help">{i18n.t('settings.security.password.help')}</p>
+			</div></div>
+			<div class="card-body">
+				<div class="info-box subtle">
+					{@html i18n.t('settings.security.password.env_only', {
+						var: '<code class="code-accent">ADMIN_PASSWORD</code>',
+						envFile: '<code class="code-accent">.env</code>',
+					})}
 				</div>
-				<span class="rounded-md px-2 py-0.5 text-xs {envIsSet('ADMIN_PASSWORD') ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}">
-					{envIsSet('ADMIN_PASSWORD') ? i18n.t('settings.security.keys.set') : i18n.t('settings.security.keys.missing')}
-				</span>
+				<div class="key-row">
+					<div>
+						<p class="key-name">{i18n.t('settings.security.password.title')}</p>
+						<p class="key-env mono">ADMIN_PASSWORD</p>
+					</div>
+					<span class="pill" class:ok={envIsSet('ADMIN_PASSWORD')} class:err={!envIsSet('ADMIN_PASSWORD')}>
+						{envIsSet('ADMIN_PASSWORD') ? i18n.t('settings.security.keys.set') : i18n.t('settings.security.keys.missing')}
+					</span>
+				</div>
 			</div>
 		</div>
 
-		<div class="rounded-xl border border-surface-700 bg-surface-900 p-5">
-			<h2 class="text-lg font-semibold text-white">{i18n.t('settings.security.keys.title')}</h2>
-			<p class="mt-1 text-sm text-surface-600">{i18n.t('settings.security.keys.help')}</p>
-
-			<div class="mt-4 space-y-3">
-				<div class="flex items-center justify-between rounded-lg bg-surface-800 px-4 py-3">
-					<div>
-						<p class="text-sm text-slate-300">{i18n.t('settings.security.keys.jwt')}</p>
-						<p class="font-mono text-xs text-surface-600">JWT_SECRET</p>
+		<div class="card">
+			<div class="card-head"><div>
+				<div class="card-title">{i18n.t('settings.security.keys.title')}</div>
+				<p class="card-help">{i18n.t('settings.security.keys.help')}</p>
+			</div></div>
+			<div class="card-body">
+				<div class="keys-list">
+					<div class="key-row">
+						<div>
+							<p class="key-name">{i18n.t('settings.security.keys.jwt')}</p>
+							<p class="key-env mono">JWT_SECRET</p>
+						</div>
+						<span class="pill" class:ok={envIsSet('JWT_SECRET')} class:err={!envIsSet('JWT_SECRET')}>
+							{envIsSet('JWT_SECRET') ? i18n.t('settings.security.keys.set') : i18n.t('settings.security.keys.missing')}
+						</span>
 					</div>
-					<span class="rounded-md px-2 py-0.5 text-xs {envIsSet('JWT_SECRET') ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}">
-						{envIsSet('JWT_SECRET') ? i18n.t('settings.security.keys.set') : i18n.t('settings.security.keys.missing')}
-					</span>
-				</div>
-				<div class="flex items-center justify-between rounded-lg bg-surface-800 px-4 py-3">
-					<div>
-						<p class="text-sm text-slate-300">{i18n.t('settings.security.keys.encryption')}</p>
-						<p class="font-mono text-xs text-surface-600">ENCRYPTION_KEY</p>
+					<div class="key-row">
+						<div>
+							<p class="key-name">{i18n.t('settings.security.keys.encryption')}</p>
+							<p class="key-env mono">ENCRYPTION_KEY</p>
+						</div>
+						<span class="pill" class:ok={envIsSet('ENCRYPTION_KEY')} class:err={!envIsSet('ENCRYPTION_KEY')}>
+							{envIsSet('ENCRYPTION_KEY') ? i18n.t('settings.security.keys.set') : i18n.t('settings.security.keys.missing')}
+						</span>
 					</div>
-					<span class="rounded-md px-2 py-0.5 text-xs {envIsSet('ENCRYPTION_KEY') ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}">
-						{envIsSet('ENCRYPTION_KEY') ? i18n.t('settings.security.keys.set') : i18n.t('settings.security.keys.missing')}
-					</span>
 				</div>
-			</div>
-
-			<div class="mt-4 rounded-lg border border-danger/30 bg-danger/5 p-3">
-				<p class="text-xs text-danger">{i18n.t('settings.security.keys.encryption_warning')}</p>
+				<div class="danger-box">
+					<svg class="icn"><use href="#i-warning" /></svg>
+					<p>{i18n.t('settings.security.keys.encryption_warning')}</p>
+				</div>
 			</div>
 		</div>
 	{/if}
 
 	<!-- ============ ADVANCED (raw .env) ============ -->
 	{#if activeTab === 'advanced'}
-		<div class="rounded-xl border border-surface-700 bg-surface-900 p-5">
-			<h2 class="text-lg font-semibold text-white">{i18n.t('settings.advanced.title')}</h2>
-			<p class="mt-1 text-sm text-surface-600">{i18n.t('settings.advanced.subtitle')}</p>
-			<p class="mt-3 rounded-md bg-warning/10 px-3 py-2 text-xs text-warning">{i18n.t('settings.advanced.warning')}</p>
+		<div class="card">
+			<div class="card-head"><div>
+				<div class="card-title">{i18n.t('settings.advanced.title')}</div>
+				<p class="card-help">{i18n.t('settings.advanced.subtitle')}</p>
+			</div></div>
+			<div class="card-body">
+				<div class="info-box warn-box">
+					<svg class="icn"><use href="#i-warning" /></svg>
+					<p>{i18n.t('settings.advanced.warning')}</p>
+				</div>
 
-			{#if envLoading}
-				<div class="flex justify-center py-8">
-					<div class="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent"></div>
-				</div>
-			{:else}
-				<div class="mt-4 overflow-hidden rounded-lg border border-surface-800">
-					<table class="w-full text-sm">
-						<thead class="bg-surface-800/50 text-left text-xs uppercase tracking-wide text-surface-500">
-							<tr>
-								<th class="px-4 py-2">{i18n.t('settings.advanced.col_key')}</th>
-								<th class="px-4 py-2">{i18n.t('settings.advanced.col_value')}</th>
-								<th class="px-4 py-2">{i18n.t('settings.advanced.col_category')}</th>
-							</tr>
-						</thead>
-						<tbody class="divide-y divide-surface-800">
-							{#each envKeys as entry}
-								<tr>
-									<td class="px-4 py-2 font-mono text-xs text-slate-300">{entry.key}</td>
-									<td class="px-4 py-2 font-mono text-xs">
-										{#if entry.preview}
-											<span class={entry.sensitive ? 'text-warning' : 'text-white'}>{entry.preview}</span>
-										{:else}
-											<span class="text-surface-600">{i18n.t('settings.advanced.empty_value')}</span>
-										{/if}
-									</td>
-									<td class="px-4 py-2">
-										<span class="rounded-md px-2 py-0.5 text-xs {categoryColor(entry.category)}">
-											{categoryLabel(entry.category)}
-										</span>
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
-			{/if}
+				{#if envLoading}
+					<div class="flex justify-center py-8">
+						<div class="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent"></div>
+					</div>
+				{:else}
+					<div class="env-table-wrap">
+						<table class="env-table">
+							<thead><tr>
+								<th>{i18n.t('settings.advanced.col_key')}</th>
+								<th>{i18n.t('settings.advanced.col_value')}</th>
+								<th>{i18n.t('settings.advanced.col_category')}</th>
+							</tr></thead>
+							<tbody>
+								{#each envKeys as entry (entry.key)}
+									<tr>
+										<td class="mono key-cell">{entry.key}</td>
+										<td class="mono">
+											{#if entry.preview}
+												<span class:sens={entry.sensitive}>{entry.preview}</span>
+											{:else}
+												<span class="dim">{i18n.t('settings.advanced.empty_value')}</span>
+											{/if}
+										</td>
+										<td>
+											<span class="cat-pill" class:edit={entry.category === 'editable'} class:secret={entry.category === 'secret'} class:read={entry.category === 'readonly'}>
+												{categoryLabel(entry.category)}
+											</span>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			</div>
 		</div>
 	{/if}
 </div>
+
+<style>
+	.topbar {
+		display: flex; justify-content: space-between; align-items: center;
+		padding-bottom: 1.25rem; margin-bottom: 0.5rem;
+		border-bottom: 1px solid var(--color-border);
+	}
+	.crumbs { display: flex; align-items: center; gap: 0.55rem; font-size: 0.82rem; color: var(--color-text-dim); }
+	.crumbs a:hover { color: var(--color-text); }
+	.crumbs b { color: var(--color-text); font-weight: 500; }
+	.crumbs .sep { opacity: 0.4; }
+
+	.hero { padding: 1.75rem 0 1.5rem; }
+	.hero h1 { font-size: 1.85rem; font-weight: 600; letter-spacing: -0.025em; margin-bottom: 0.5rem; }
+	.hero p { font-size: 0.9rem; color: var(--color-text-dim); line-height: 1.55; }
+
+	.tabs {
+		display: flex; gap: 0.15rem;
+		border-bottom: 1px solid var(--color-border);
+		margin-bottom: 1.5rem;
+		overflow-x: auto;
+		scrollbar-width: none;       /* Firefox */
+		-ms-overflow-style: none;    /* IE/Edge legacy */
+	}
+	.tabs::-webkit-scrollbar { display: none; }
+	.tab {
+		padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--color-text-dim);
+		border-bottom: 2px solid transparent; margin-bottom: -1px;
+		display: inline-flex; align-items: center; gap: 0.45rem;
+		transition: color 0.12s; white-space: nowrap;
+		background: none; border-top: none; border-left: none; border-right: none;
+		cursor: pointer; font-family: inherit;
+	}
+	.tab:hover { color: var(--color-text); }
+	.tab.active { color: var(--color-text); border-bottom-color: var(--color-accent); font-weight: 500; }
+
+	.content { width: 100%; }
+
+	.card { background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 1rem; overflow: hidden; }
+	.card-head { padding: 1rem 1.25rem; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+	.card-title { font-size: 0.95rem; font-weight: 600; }
+	.card-help { margin-top: 0.3rem; font-size: 0.8rem; color: var(--color-text-dim); }
+	.card-body { padding: 1.25rem; }
+
+	/* Stats grid */
+	.stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.85rem; }
+	.stat-cell { padding: 0.85rem; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 9px; }
+	.stat-label {
+		font-size: 0.7rem; font-weight: 600; color: var(--color-text-dim);
+		text-transform: uppercase; letter-spacing: 0.07em;
+	}
+	.stat-val {
+		margin-top: 0.4rem; font-size: 1.4rem; font-weight: 600;
+		letter-spacing: -0.025em; font-feature-settings: 'tnum';
+	}
+	.stat-val.ok { color: var(--color-success); }
+	.stat-val.warn { color: var(--color-warn); }
+
+	/* Tmp row */
+	.tmp-row {
+		display: flex; justify-content: space-between; align-items: center;
+		padding: 0.85rem 1.1rem; background: var(--color-bg);
+		border: 1px solid var(--color-border); border-radius: 9px; margin-bottom: 0.85rem;
+	}
+	.tmp-row.warn { background: rgba(251, 146, 60, 0.04); border-color: rgba(251, 146, 60, 0.25); }
+	.tmp-row.ok { background: rgba(74, 222, 128, 0.04); border-color: rgba(74, 222, 128, 0.25); }
+	.tmp-left { display: inline-flex; align-items: center; gap: 0.55rem; font-size: 0.88rem; }
+	.tmp-left .warn { color: var(--color-warn); }
+	.tmp-left .ok { color: var(--color-success); }
+	.tmp-left .size { color: var(--color-text-dim); font-family: 'Geist Mono', monospace; font-size: 0.78rem; }
+	.help { font-size: 0.78rem; color: var(--color-text-dim); line-height: 1.55; }
+
+	/* Form */
+	.field { margin-bottom: 1.1rem; }
+	.field:last-child { margin-bottom: 0; }
+	.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.1rem; }
+	.grid-2:last-child { margin-bottom: 0; }
+	.field label {
+		display: block;
+		font-size: 0.78rem; font-weight: 500;
+		color: var(--color-text); margin-bottom: 0.45rem;
+	}
+	.field input {
+		width: 100%; padding: 0.6rem 0.85rem;
+		background: var(--color-bg); color: var(--color-text);
+		border: 1px solid var(--color-border); border-radius: 8px;
+		font: inherit; transition: border-color 0.12s;
+		font-size: 0.88rem;
+	}
+	.field input:focus {
+		outline: none; border-color: var(--color-accent);
+		box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.1);
+	}
+	.field input.mono { font-family: 'Geist Mono', monospace; font-size: 0.85rem; }
+	.field input::placeholder { color: var(--color-text-dimmer); }
+	.field-help { margin-top: 0.4rem; font-size: 0.76rem; color: var(--color-text-dim); }
+	.field-help :global(.link-accent) { color: var(--color-accent); }
+	.field-help :global(.link-accent:hover) { color: var(--color-accent-2); }
+
+	.toggle-line {
+		display: flex; align-items: center; gap: 0.6rem;
+		cursor: pointer; padding: 0.6rem 0.85rem;
+		background: var(--color-bg); border: 1px solid var(--color-border);
+		border-radius: 8px;
+		font-size: 0.85rem; color: var(--color-text);
+		margin-bottom: 1.1rem; flex-wrap: wrap;
+	}
+	.toggle-line.inline { padding: 0.35rem 0.75rem; margin: 0; background: var(--color-bg); }
+	.toggle-line:hover { border-color: var(--color-border-2); }
+	.toggle-line input { accent-color: var(--color-accent); width: 16px; height: 16px; cursor: pointer; }
+	.toggle-line small { color: var(--color-text-dim); font-size: 0.76rem; }
+
+	.actions {
+		display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;
+		margin-top: 1.25rem;
+	}
+	.test-result { font-size: 0.85rem; }
+	.text-success { color: var(--color-success); }
+	.text-danger { color: var(--color-danger); }
+
+	.btn {
+		padding: 0.55rem 1rem; border-radius: 8px;
+		font-size: 0.84rem; font-weight: 500;
+		border: 1px solid var(--color-border); background: var(--color-card);
+		color: var(--color-text); display: inline-flex; align-items: center; gap: 0.45rem;
+		transition: all 0.12s; cursor: pointer; font-family: inherit;
+	}
+	.btn:hover:not(:disabled) { border-color: var(--color-border-2); background: var(--color-card-2); }
+	.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+	.btn.primary { background: var(--color-accent); color: #1a1208; border-color: var(--color-accent); font-weight: 600; }
+	.btn.primary:hover:not(:disabled) { background: var(--color-accent-2); border-color: var(--color-accent-2); }
+	.warn-btn {
+		padding: 0.4rem 0.85rem; border-radius: 6px;
+		background: rgba(251, 146, 60, 0.15);
+		border: 1px solid rgba(251, 146, 60, 0.3);
+		color: var(--color-warn); font-size: 0.78rem; font-weight: 500;
+		cursor: pointer; font-family: inherit;
+	}
+	.warn-btn:hover:not(:disabled) { background: var(--color-warn); color: #1a0c04; border-color: var(--color-warn); }
+
+	/* Status line (monitoring active/inactive) */
+	.status-line {
+		display: inline-flex; align-items: center; gap: 0.5rem;
+		font-size: 0.85rem; color: var(--color-text-dim);
+		margin-bottom: 1.25rem;
+	}
+	.status-line .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-dimmer); }
+	.status-line.ok { color: var(--color-success); }
+	.status-line.ok .dot { background: var(--color-success); box-shadow: 0 0 8px var(--color-success); }
+
+	/* Info boxes */
+	.info-box {
+		padding: 0.95rem 1.1rem; border-radius: 10px;
+		background: rgba(251, 191, 36, 0.05);
+		border: 1px solid rgba(251, 191, 36, 0.2);
+		font-size: 0.82rem; color: var(--color-text-dim); line-height: 1.55;
+		margin-top: 1rem;
+	}
+	.info-box.subtle {
+		background: var(--color-bg); border-color: var(--color-border);
+		margin-top: 0; margin-bottom: 1rem;
+	}
+	.info-box.warn-box {
+		background: rgba(251, 146, 60, 0.05);
+		border-color: rgba(251, 146, 60, 0.25);
+		display: flex; gap: 0.6rem; align-items: flex-start;
+		color: var(--color-warn);
+		margin-top: 0; margin-bottom: 1rem;
+	}
+	.info-box.warn-box p { color: var(--color-text); }
+	.info-box.warn-box .icn { flex-shrink: 0; margin-top: 0.15rem; }
+	.info-box :global(code.code-accent) {
+		font-family: 'Geist Mono', monospace; font-size: 0.78rem;
+		padding: 0.1rem 0.4rem; border-radius: 4px;
+		background: rgba(0, 0, 0, 0.3); color: var(--color-accent);
+	}
+
+	.danger-box {
+		margin-top: 1rem; padding: 0.85rem 1.1rem;
+		background: rgba(248, 113, 113, 0.05);
+		border: 1px solid rgba(248, 113, 113, 0.25);
+		border-radius: 10px;
+		display: flex; gap: 0.6rem; align-items: flex-start;
+		font-size: 0.82rem; color: var(--color-danger); line-height: 1.55;
+	}
+	.danger-box .icn { flex-shrink: 0; margin-top: 0.1rem; }
+
+	/* Security keys */
+	.keys-list { display: flex; flex-direction: column; gap: 0.6rem; }
+	.key-row {
+		display: flex; justify-content: space-between; align-items: center;
+		padding: 0.85rem 1.1rem;
+		background: var(--color-bg); border: 1px solid var(--color-border);
+		border-radius: 9px; gap: 1rem;
+	}
+	.key-name { font-size: 0.88rem; color: var(--color-text); font-weight: 500; }
+	.key-env { font-size: 0.76rem; color: var(--color-text-dim); margin-top: 0.15rem; }
+	.pill {
+		padding: 0.18rem 0.6rem; border-radius: 999px;
+		font-size: 0.72rem; font-weight: 500;
+	}
+	.pill.ok { background: rgba(74, 222, 128, 0.1); color: var(--color-success); }
+	.pill.err { background: rgba(248, 113, 113, 0.1); color: var(--color-danger); }
+
+	/* Env table */
+	.env-table-wrap {
+		border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden;
+	}
+	.env-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+	.env-table th {
+		text-align: left; padding: 0.6rem 0.9rem;
+		font-size: 0.66rem; font-weight: 600; color: var(--color-text-dim);
+		text-transform: uppercase; letter-spacing: 0.08em;
+		border-bottom: 1px solid var(--color-border);
+		background: rgba(0, 0, 0, 0.2);
+	}
+	.env-table td {
+		padding: 0.55rem 0.9rem; border-bottom: 1px solid var(--color-border);
+	}
+	.env-table tbody tr:last-child td { border-bottom: none; }
+	.env-table .mono { font-family: 'Geist Mono', monospace; font-size: 0.78rem; }
+	.env-table .key-cell { color: var(--color-text); }
+	.env-table .sens { color: var(--color-warn); }
+	.env-table .dim { color: var(--color-text-dimmer); }
+	.cat-pill {
+		padding: 0.12rem 0.5rem; border-radius: 999px;
+		font-size: 0.68rem; font-weight: 500;
+	}
+	.cat-pill.edit { background: rgba(74, 222, 128, 0.12); color: var(--color-success); }
+	.cat-pill.secret { background: rgba(248, 113, 113, 0.12); color: var(--color-danger); }
+	.cat-pill.read { background: var(--color-border); color: var(--color-text-dim); }
+
+	.icn { width: 14px; height: 14px; flex-shrink: 0; }
+
+	@media (max-width: 1100px) {
+		.stats-grid { grid-template-columns: repeat(3, 1fr); }
+	}
+	@media (max-width: 760px) {
+		.stats-grid { grid-template-columns: repeat(2, 1fr); }
+		.grid-2 { grid-template-columns: 1fr; }
+		.crumbs { font-size: 0.78rem; }
+		.card-head { padding: 0.85rem 1rem; flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+		.card-head .toggle-line.inline { width: 100%; justify-content: flex-start; }
+		.card-body { padding: 1rem; }
+		.tmp-row { flex-direction: column; align-items: flex-start; gap: 0.6rem; padding: 0.85rem 1rem; }
+		.tmp-row .warn-btn { width: 100%; text-align: center; }
+		.tmp-left { flex-wrap: wrap; }
+		.actions { flex-direction: column; align-items: stretch; }
+		.actions .btn { width: 100%; justify-content: center; }
+		/* Env table — scroll horizontal */
+		.env-table-wrap { overflow-x: auto; }
+		.env-table { min-width: 540px; }
+	}
+	@media (max-width: 480px) {
+		.stats-grid { grid-template-columns: 1fr; }
+	}
+</style>

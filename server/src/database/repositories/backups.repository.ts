@@ -111,6 +111,20 @@ export const backupsRepo = {
     db.prepare(`UPDATE backups SET ${fields.join(', ')} WHERE id = ?`).run(...values);
   },
 
+  // Réinitialise une sauvegarde pour une relance « sur place » : on repart de
+  // zéro (statut running, horodatage, taille, erreur, métadonnées) en gardant la
+  // même ligne et le même file_path → le dump existant est écrasé par la relance.
+  resetForRerun(id: number): void {
+    getDb()
+      .prepare(
+        `UPDATE backups
+         SET status = 'running', started_at = datetime('now'),
+             completed_at = NULL, error_message = NULL, size_bytes = 0, metadata = ''
+         WHERE id = ?`,
+      )
+      .run(id);
+  },
+
   delete(id: number): boolean {
     const result = getDb().prepare('DELETE FROM backups WHERE id = ?').run(id);
     return result.changes > 0;
@@ -158,5 +172,19 @@ export const backupsRepo = {
       )
       .get(`-${sinceDays} days`) as { count: number };
     return row.count;
+  },
+
+  findLastFailure(sinceDays = 30): { project_id: number; project_name: string; started_at: string; backup_id: number } | null {
+    const row = getDb()
+      .prepare(
+        `SELECT b.id as backup_id, b.project_id, b.started_at, p.name as project_name
+         FROM backups b JOIN projects p ON p.id = b.project_id
+         WHERE b.status = 'failed' AND b.started_at > datetime('now', ?)
+         ORDER BY b.started_at DESC LIMIT 1`,
+      )
+      .get(`-${sinceDays} days`) as
+      | { project_id: number; project_name: string; started_at: string; backup_id: number }
+      | undefined;
+    return row ?? null;
   },
 };

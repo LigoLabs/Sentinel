@@ -111,11 +111,11 @@
 	let remoteWebRoot = $state(init.remoteWebRoot || '');
 	let siteUrl = $state(init.siteUrl || '');
 
-	const sourceTypes: { value: string; key: TranslationKey; category: 'database' | 'storage' }[] = [
+	const sourceTypes: { value: string; key: TranslationKey; category: 'application' | 'database' | 'storage' }[] = [
+		{ value: 'wordpress', key: 'source.type.wordpress', category: 'application' },
 		{ value: 'turso', key: 'source.type.turso', category: 'database' },
 		{ value: 'mysql-ssh', key: 'source.type.mysql-ssh', category: 'database' },
 		{ value: 'postgres-ssh', key: 'source.type.postgres-ssh', category: 'database' },
-		{ value: 'wordpress', key: 'source.type.wordpress', category: 'database' },
 		{ value: 'vercel-blob', key: 'source.type.vercel-blob', category: 'storage' },
 		{ value: 'ssh-sftp', key: 'source.type.ssh-sftp', category: 'storage' },
 		{ value: 'ftp', key: 'source.type.ftp', category: 'storage' },
@@ -126,6 +126,12 @@
 
 	const infoWhatKey = $derived(`source.info.${type}.what` as TranslationKey);
 	const infoHowKey = $derived(`source.info.${type}.how` as TranslationKey);
+	const labelPlaceholder = $derived.by(() => {
+		const key = `source.label_placeholder.${type}` as TranslationKey;
+		const translated = i18n.t(key);
+		// If the key is missing, i18n.t returns the key itself — fall back to a generic example.
+		return translated === key ? i18n.t('source.label_placeholder.fallback') : translated;
+	});
 
 	function getSshConfig(): Record<string, unknown> {
 		return {
@@ -238,8 +244,13 @@
 <form onsubmit={handleSubmit} class="space-y-4">
 	<div class="grid grid-cols-2 gap-4">
 		<div>
-			<label class="mb-1 block text-sm text-slate-300">{i18n.t('source.type')}</label>
-			<select bind:value={type} disabled={isEdit} class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-white focus:border-accent focus:outline-none disabled:opacity-60">
+			<label class="mb-1 block text-sm text-text">{i18n.t('source.type')}</label>
+			<select bind:value={type} disabled={isEdit} class="w-full rounded-lg border border-border bg-bg px-3 py-2 text-white focus:border-accent focus:outline-none disabled:opacity-60">
+				<optgroup label={i18n.t('source.group.application')}>
+					{#each sourceTypes.filter(s => s.category === 'application') as st}
+						<option value={st.value}>{i18n.t(st.key)}</option>
+					{/each}
+				</optgroup>
 				<optgroup label={i18n.t('source.group.database')}>
 					{#each sourceTypes.filter(s => s.category === 'database') as st}
 						<option value={st.value}>{i18n.t(st.key)}</option>
@@ -253,8 +264,9 @@
 			</select>
 		</div>
 		<div>
-			<label class="mb-1 block text-sm text-slate-300">{i18n.t('source.label')}</label>
-			<input bind:value={label} placeholder={i18n.t('source.label_placeholder')} required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+			<label class="mb-1 block text-sm text-text">{i18n.t('source.label')}</label>
+			<input bind:value={label} placeholder={labelPlaceholder} required class="w-full rounded-lg border border-border bg-bg px-3 py-2 text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
+			<p class="mt-0.5 text-xs text-text-dim">{i18n.t('source.label_help')}</p>
 		</div>
 	</div>
 
@@ -264,15 +276,15 @@
 			<svg class="mt-0.5 h-4 w-4 shrink-0 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 			</svg>
-			<div class="flex-1 space-y-2 text-xs leading-relaxed text-slate-300">
+			<div class="flex-1 space-y-2 text-xs leading-relaxed text-text">
 				<p class="font-semibold text-accent">{i18n.t('source.info.heading')}</p>
 				<div>
-					<p class="font-medium text-slate-200">{i18n.t('source.info.what_label')}</p>
-					<p class="mt-0.5 text-surface-400">{i18n.t(infoWhatKey)}</p>
+					<p class="font-medium text-text">{i18n.t('source.info.what_label')}</p>
+					<p class="mt-0.5 text-text-dim">{i18n.t(infoWhatKey)}</p>
 				</div>
 				<div>
-					<p class="font-medium text-slate-200">{i18n.t('source.info.how_label')}</p>
-					<p class="mt-0.5 whitespace-pre-line text-surface-400">{i18n.t(infoHowKey)}</p>
+					<p class="font-medium text-text">{i18n.t('source.info.how_label')}</p>
+					<p class="mt-0.5 whitespace-pre-line text-text-dim">{i18n.t(infoHowKey)}</p>
 				</div>
 			</div>
 		</div>
@@ -281,21 +293,21 @@
 	<!-- Turso -->
 	{#if type === 'turso'}
 		<div>
-			<label class="mb-1 block text-sm text-slate-300">{i18n.t('source.turso.url')}</label>
-			<input bind:value={tursoUrl} placeholder="libsql://your-db.turso.io" required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+			<label class="mb-1 block text-sm text-text">{i18n.t('source.turso.url')}</label>
+			<input bind:value={tursoUrl} placeholder="libsql://your-db.turso.io" required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 		</div>
 		<div>
-			<label class="mb-1 block text-sm text-slate-300">{i18n.t('source.turso.token')}</label>
-			<input bind:value={tursoToken} type="password" placeholder="eyJ..." required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+			<label class="mb-1 block text-sm text-text">{i18n.t('source.turso.token')}</label>
+			<input bind:value={tursoToken} type="password" placeholder="eyJ..." required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 		</div>
 	{/if}
 
 	<!-- Vercel Blob -->
 	{#if type === 'vercel-blob'}
 		<div>
-			<label class="mb-1 block text-sm text-slate-300">{i18n.t('source.blob.token')}</label>
-			<input bind:value={blobToken} type="password" placeholder="vercel_blob_rw_..." required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
-			<p class="mt-1 text-xs text-surface-600">
+			<label class="mb-1 block text-sm text-text">{i18n.t('source.blob.token')}</label>
+			<input bind:value={blobToken} type="password" placeholder="vercel_blob_rw_..." required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
+			<p class="mt-1 text-xs text-text-dim">
 				{i18n.t('source.blob.help')}
 			</p>
 		</div>
@@ -303,30 +315,30 @@
 
 	<!-- SSH common fields -->
 	{#if needsSsh}
-		<div class="rounded-lg border border-surface-700 bg-surface-800/50 p-4 space-y-3">
-			<h3 class="text-sm font-medium text-slate-300">{i18n.t('source.ssh.section')}</h3>
+		<div class="rounded-lg border border-border bg-bg p-4 space-y-3">
+			<h3 class="text-sm font-medium text-text">{i18n.t('source.ssh.section')}</h3>
 			<div class="grid grid-cols-[1fr_auto] gap-3">
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ssh.host')}</label>
-					<input bind:value={sshHost} placeholder={i18n.t('source.ssh.host_placeholder')} required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.ssh.host')}</label>
+					<input bind:value={sshHost} placeholder={i18n.t('source.ssh.host_placeholder')} required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 				</div>
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ssh.port')}</label>
-					<input bind:value={sshPort} type="number" class="w-24 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.ssh.port')}</label>
+					<input bind:value={sshPort} type="number" class="w-24 rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
 				</div>
 			</div>
 			<div>
-				<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ssh.user')}</label>
-				<input bind:value={sshUser} placeholder="root" required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+				<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.ssh.user')}</label>
+				<input bind:value={sshUser} placeholder="root" required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 			</div>
 			<div>
-				<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ssh.auth')}</label>
+				<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.ssh.auth')}</label>
 				<div class="flex gap-3">
-					<label class="flex items-center gap-1.5 text-sm text-surface-600 cursor-pointer">
+					<label class="flex items-center gap-1.5 text-sm text-text-dim cursor-pointer">
 						<input type="radio" bind:group={sshAuthMethod} value="password" class="accent-accent" />
 						{i18n.t('source.ssh.auth.password')}
 					</label>
-					<label class="flex items-center gap-1.5 text-sm text-surface-600 cursor-pointer">
+					<label class="flex items-center gap-1.5 text-sm text-text-dim cursor-pointer">
 						<input type="radio" bind:group={sshAuthMethod} value="key" class="accent-accent" />
 						{i18n.t('source.ssh.auth.key')}
 					</label>
@@ -334,13 +346,13 @@
 			</div>
 			{#if sshAuthMethod === 'password'}
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ssh.password')}</label>
-					<input bind:value={sshPassword} type="password" required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.ssh.password')}</label>
+					<input bind:value={sshPassword} type="password" required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 				</div>
 			{:else}
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ssh.private_key')}</label>
-					<textarea bind:value={sshPrivateKey} rows="4" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;..." required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-xs text-white placeholder-surface-600 focus:border-accent focus:outline-none resize-none"></textarea>
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.ssh.private_key')}</label>
+					<textarea bind:value={sshPrivateKey} rows="4" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;..." required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-xs text-white placeholder-text-dimmer focus:border-accent focus:outline-none resize-none"></textarea>
 				</div>
 			{/if}
 		</div>
@@ -348,64 +360,64 @@
 
 	<!-- MySQL via SSH -->
 	{#if type === 'mysql-ssh'}
-		<div class="rounded-lg border border-surface-700 bg-surface-800/50 p-4 space-y-3">
-			<h3 class="text-sm font-medium text-slate-300">{i18n.t('source.mysql.section')}</h3>
+		<div class="rounded-lg border border-border bg-bg p-4 space-y-3">
+			<h3 class="text-sm font-medium text-text">{i18n.t('source.mysql.section')}</h3>
 			<div class="grid grid-cols-[1fr_auto] gap-3">
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.mysql.host')}</label>
-					<input bind:value={mysqlHost} placeholder="127.0.0.1" class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
-					<p class="mt-0.5 text-xs text-surface-600">{i18n.t('source.mysql.host_help')}</p>
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.mysql.host')}</label>
+					<input bind:value={mysqlHost} placeholder="127.0.0.1" class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
+					<p class="mt-0.5 text-xs text-text-dim">{i18n.t('source.mysql.host_help')}</p>
 				</div>
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.mysql.port')}</label>
-					<input bind:value={mysqlPort} type="number" class="w-24 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.mysql.port')}</label>
+					<input bind:value={mysqlPort} type="number" class="w-24 rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
 				</div>
 			</div>
 			<div class="grid grid-cols-2 gap-3">
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.mysql.user')}</label>
-					<input bind:value={mysqlUser} placeholder="root" required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.mysql.user')}</label>
+					<input bind:value={mysqlUser} placeholder="root" required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 				</div>
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.mysql.password')}</label>
-					<input bind:value={mysqlPassword} type="password" class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.mysql.password')}</label>
+					<input bind:value={mysqlPassword} type="password" class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 				</div>
 			</div>
 			<div>
-				<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.mysql.database')}</label>
-				<input bind:value={mysqlDatabase} placeholder={i18n.t('source.mysql.database_placeholder')} required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+				<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.mysql.database')}</label>
+				<input bind:value={mysqlDatabase} placeholder={i18n.t('source.mysql.database_placeholder')} required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 			</div>
 		</div>
 	{/if}
 
 	<!-- PostgreSQL via SSH -->
 	{#if type === 'postgres-ssh'}
-		<div class="rounded-lg border border-surface-700 bg-surface-800/50 p-4 space-y-3">
-			<h3 class="text-sm font-medium text-slate-300">{i18n.t('source.postgres.section')}</h3>
+		<div class="rounded-lg border border-border bg-bg p-4 space-y-3">
+			<h3 class="text-sm font-medium text-text">{i18n.t('source.postgres.section')}</h3>
 			<div class="grid grid-cols-[1fr_auto] gap-3">
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.postgres.host')}</label>
-					<input bind:value={pgHost} placeholder="127.0.0.1" class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
-					<p class="mt-0.5 text-xs text-surface-600">{i18n.t('source.postgres.host_help')}</p>
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.postgres.host')}</label>
+					<input bind:value={pgHost} placeholder="127.0.0.1" class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
+					<p class="mt-0.5 text-xs text-text-dim">{i18n.t('source.postgres.host_help')}</p>
 				</div>
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.postgres.port')}</label>
-					<input bind:value={pgPort} type="number" class="w-24 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.postgres.port')}</label>
+					<input bind:value={pgPort} type="number" class="w-24 rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
 				</div>
 			</div>
 			<div class="grid grid-cols-2 gap-3">
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.postgres.user')}</label>
-					<input bind:value={pgUser} placeholder="postgres" required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.postgres.user')}</label>
+					<input bind:value={pgUser} placeholder="postgres" required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 				</div>
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.postgres.password')}</label>
-					<input bind:value={pgPassword} type="password" class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.postgres.password')}</label>
+					<input bind:value={pgPassword} type="password" class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 				</div>
 			</div>
 			<div>
-				<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.postgres.database')}</label>
-				<input bind:value={pgDatabase} placeholder={i18n.t('source.postgres.database_placeholder')} required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+				<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.postgres.database')}</label>
+				<input bind:value={pgDatabase} placeholder={i18n.t('source.postgres.database_placeholder')} required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 			</div>
 		</div>
 	{/if}
@@ -413,47 +425,47 @@
 	<!-- SSH SFTP remote path -->
 	{#if type === 'ssh-sftp'}
 		<div>
-			<label class="mb-1 block text-sm text-slate-300">{i18n.t('source.sftp.path')}</label>
-			<input bind:value={remotePath} placeholder={i18n.t('source.sftp.path_placeholder')} required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
-			<p class="mt-1 text-xs text-surface-600">
+			<label class="mb-1 block text-sm text-text">{i18n.t('source.sftp.path')}</label>
+			<input bind:value={remotePath} placeholder={i18n.t('source.sftp.path_placeholder')} required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
+			<p class="mt-1 text-xs text-text-dim">
 				{i18n.t('source.sftp.path_help')}
 			</p>
 		</div>
 		<label class="flex items-center gap-2 cursor-pointer">
 			<input type="checkbox" bind:checked={useSudo} class="h-4 w-4 rounded accent-accent" />
-			<span class="text-sm text-slate-300">{i18n.t('source.sftp.sudo')}</span>
-			<span class="text-xs text-surface-600">{i18n.t('source.sftp.sudo_help')}</span>
+			<span class="text-sm text-text">{i18n.t('source.sftp.sudo')}</span>
+			<span class="text-xs text-text-dim">{i18n.t('source.sftp.sudo_help')}</span>
 		</label>
 	{/if}
 
 	<!-- FTP common fields (used by 'ftp' and 'wordpress') -->
 	{#if needsFtp}
-		<div class="rounded-lg border border-surface-700 bg-surface-800/50 p-4 space-y-3">
-			<h3 class="text-sm font-medium text-slate-300">{i18n.t('source.ftp.section')}</h3>
+		<div class="rounded-lg border border-border bg-bg p-4 space-y-3">
+			<h3 class="text-sm font-medium text-text">{i18n.t('source.ftp.section')}</h3>
 			<div class="grid grid-cols-[1fr_auto] gap-3">
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ftp.host')}</label>
-					<input bind:value={ftpHost} placeholder={i18n.t('source.ftp.host_placeholder')} required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.ftp.host')}</label>
+					<input bind:value={ftpHost} placeholder={i18n.t('source.ftp.host_placeholder')} required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 				</div>
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ftp.port')}</label>
-					<input bind:value={ftpPort} type="number" class="w-24 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.ftp.port')}</label>
+					<input bind:value={ftpPort} type="number" class="w-24 rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white focus:border-accent focus:outline-none" />
 				</div>
 			</div>
 			<div class="grid grid-cols-2 gap-3">
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ftp.user')}</label>
-					<input bind:value={ftpUser} required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.ftp.user')}</label>
+					<input bind:value={ftpUser} required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 				</div>
 				<div>
-					<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.ftp.password')}</label>
-					<input bind:value={ftpPassword} type="password" class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
+					<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.ftp.password')}</label>
+					<input bind:value={ftpPassword} type="password" class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
 				</div>
 			</div>
 			<label class="flex items-center gap-2 cursor-pointer">
 				<input type="checkbox" bind:checked={ftpSecure} class="h-4 w-4 rounded accent-accent" />
-				<span class="text-sm text-slate-300">{i18n.t('source.ftp.secure')}</span>
-				<span class="text-xs text-surface-600">{i18n.t('source.ftp.secure_help')}</span>
+				<span class="text-sm text-text">{i18n.t('source.ftp.secure')}</span>
+				<span class="text-xs text-text-dim">{i18n.t('source.ftp.secure_help')}</span>
 			</label>
 		</div>
 	{/if}
@@ -461,9 +473,9 @@
 	<!-- FTP storage remote path -->
 	{#if type === 'ftp'}
 		<div>
-			<label class="mb-1 block text-sm text-slate-300">{i18n.t('source.ftp.path')}</label>
-			<input bind:value={remotePath} placeholder={i18n.t('source.ftp.path_placeholder')} required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
-			<p class="mt-1 text-xs text-surface-600">
+			<label class="mb-1 block text-sm text-text">{i18n.t('source.ftp.path')}</label>
+			<input bind:value={remotePath} placeholder={i18n.t('source.ftp.path_placeholder')} required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
+			<p class="mt-1 text-xs text-text-dim">
 				{i18n.t('source.ftp.path_help')}
 			</p>
 		</div>
@@ -471,26 +483,26 @@
 
 	<!-- WordPress-specific fields -->
 	{#if type === 'wordpress'}
-		<div class="rounded-lg border border-surface-700 bg-surface-800/50 p-4 space-y-3">
-			<h3 class="text-sm font-medium text-slate-300">{i18n.t('source.wordpress.section')}</h3>
+		<div class="rounded-lg border border-border bg-bg p-4 space-y-3">
+			<h3 class="text-sm font-medium text-text">{i18n.t('source.wordpress.section')}</h3>
 			<div>
-				<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.wordpress.webroot')}</label>
-				<input bind:value={remoteWebRoot} placeholder={i18n.t('source.wordpress.webroot_placeholder')} required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
-				<p class="mt-0.5 text-xs text-surface-600">{i18n.t('source.wordpress.webroot_help')}</p>
+				<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.wordpress.webroot')}</label>
+				<input bind:value={remoteWebRoot} placeholder={i18n.t('source.wordpress.webroot_placeholder')} required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
+				<p class="mt-0.5 text-xs text-text-dim">{i18n.t('source.wordpress.webroot_help')}</p>
 			</div>
 			<div>
-				<label class="mb-1 block text-xs text-surface-600">{i18n.t('source.wordpress.url')}</label>
-				<input bind:value={siteUrl} placeholder="https://example.com" required class="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 font-mono text-sm text-white placeholder-surface-600 focus:border-accent focus:outline-none" />
-				<p class="mt-0.5 text-xs text-surface-600">{i18n.t('source.wordpress.url_help')}</p>
+				<label class="mb-1 block text-xs text-text-dim">{i18n.t('source.wordpress.url')}</label>
+				<input bind:value={siteUrl} placeholder="https://example.com" required class="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm text-white placeholder-text-dimmer focus:border-accent focus:outline-none" />
+				<p class="mt-0.5 text-xs text-text-dim">{i18n.t('source.wordpress.url_help')}</p>
 			</div>
 		</div>
 	{/if}
 
 	<div class="flex gap-3">
-		<button type="button" onclick={testConnection} disabled={testing} class="rounded-lg border border-surface-700 px-4 py-2 text-sm text-surface-600 transition hover:bg-surface-800 disabled:opacity-50">
+		<button type="button" onclick={testConnection} disabled={testing} class="rounded-lg border border-border px-4 py-2 text-sm text-text-dim transition hover:bg-card-2 disabled:opacity-50">
 			{testing ? i18n.t('source.testing') : i18n.t('source.test')}
 		</button>
-		<button type="submit" disabled={saving} class="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50">
+		<button type="submit" disabled={saving} class="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-[#1a1208] hover:bg-accent-2 disabled:opacity-50">
 			{#if saving}
 				{isEdit ? i18n.t('source.submit.editing') : i18n.t('source.submit.adding')}
 			{:else}

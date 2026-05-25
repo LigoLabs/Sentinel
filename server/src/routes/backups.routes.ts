@@ -103,6 +103,31 @@ export async function backupRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  // Relance une sauvegarde « sur place » : même projet, même type/config, en
+  // écrasant le dump existant (même ligne, même fichier).
+  app.post<{ Params: { id: string } }>('/:id/rerun', async (request, reply) => {
+    const backup = backupsRepo.findById(Number(request.params.id));
+    if (!backup) return sendError(reply, 'backup.not_found');
+    const project = projectsRepo.findById(backup.project_id);
+    if (!project) return sendError(reply, 'project.not_found');
+
+    // On refuse si une sauvegarde tourne déjà pour ce projet (la relance réinitialise la ligne).
+    // getProgress ne renvoie une valeur que pendant un run ; 'done' précède le clear.
+    const active = getProgress(backup.project_id);
+    if (active && active.phase !== 'done') {
+      return sendError(reply, 'backup.already_running');
+    }
+
+    const allowed = ['daily', 'monthly', 'manual'];
+    const type = (allowed.includes(backup.type) ? backup.type : 'manual') as 'daily' | 'monthly' | 'manual';
+
+    runBackup(backup.project_id, type, { reuseBackupId: backup.id }).catch((err) => {
+      console.error('[backup] Async rerun failed:', err);
+    });
+
+    return reply.code(202).send({ projectId: backup.project_id, backupId: backup.id, started: true });
+  });
+
   app.delete<{ Params: { id: string } }>('/:id', async (request, reply) => {
     const backup = backupsRepo.findById(Number(request.params.id));
     if (!backup) return sendError(reply, 'backup.not_found');

@@ -1,10 +1,10 @@
 import { mkdirSync, writeFileSync, statSync, readdirSync, rmSync, createWriteStream } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import archiver from 'archiver';
 import { config } from '../config.js';
 import { projectsRepo } from '../database/repositories/projects.repository.js';
 import { sourcesRepo } from '../database/repositories/sources.repository.js';
-import { backupsRepo } from '../database/repositories/backups.repository.js';
+import { backupsRepo, type Backup } from '../database/repositories/backups.repository.js';
 import { alertsRepo } from '../database/repositories/alerts.repository.js';
 import { getDatabaseConnector } from '../connectors/database/registry.js';
 import { getStorageConnector } from '../connectors/storage/registry.js';
@@ -48,23 +48,38 @@ function zipDirectory(sourceDir: string, zipPath: string): Promise<number> {
 export async function runBackup(
   projectId: number,
   type: 'daily' | 'monthly' | 'manual',
+  options: { reuseBackupId?: number } = {},
 ): Promise<BackupResult> {
   const startTime = Date.now();
   const project = projectsRepo.findById(projectId);
   if (!project) throw new Error(`Project ${projectId} not found`);
 
   const now = new Date();
-  const timestamp = formatTimestamp(now);
   const projectSlug = slugify(project.name);
-  const backupName = `bkp_${projectSlug}_${timestamp}`;
-
   const projectDir = join(config.BACKUP_DIR, projectSlug, type);
+
+  // Relance « sur place » : on réutilise la même ligne et on écrase le même .zip.
+  // Sinon : nouvelle ligne + nouveau fichier horodaté.
+  let backup: Backup;
+  let zipPath: string;
+  let backupName: string;
+  if (options.reuseBackupId) {
+    const existing = backupsRepo.findById(options.reuseBackupId);
+    if (!existing || existing.project_id !== projectId) {
+      throw new Error(`Backup ${options.reuseBackupId} not found for project ${projectId}`);
+    }
+    zipPath = existing.file_path ?? join(projectDir, `bkp_${projectSlug}_${formatTimestamp(now)}.zip`);
+    backupName = basename(zipPath).replace(/\.zip$/i, '');
+    backupsRepo.resetForRerun(existing.id);
+    backup = backupsRepo.findById(existing.id)!;
+  } else {
+    backupName = `bkp_${projectSlug}_${formatTimestamp(now)}`;
+    zipPath = join(projectDir, `${backupName}.zip`);
+    backup = backupsRepo.create({ project_id: projectId, type, file_path: zipPath });
+  }
+
   const tmpDir = join(projectDir, `_tmp_${backupName}`);
-  const zipPath = join(projectDir, `${backupName}.zip`);
-
   mkdirSync(tmpDir, { recursive: true });
-
-  const backup = backupsRepo.create({ project_id: projectId, type, file_path: zipPath });
 
   updateProgress(projectId, { phase: 'starting', backupId: backup.id, message: 'Démarrage du backup...' });
   await pingBackupStart();

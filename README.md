@@ -19,6 +19,48 @@ Self-hosted backup orchestrator for your web projects. Schedule database dumps a
 +--------------------+                  └── daily | monthly /*.zip
 ```
 
+## Screenshots
+
+> The data shown below is **fictitious** — example projects (« Atelier Saint-Roch », « Coopérative Marais », « Brasserie Lumen »…) generated for the docs. Les données affichées sont **fictives** : projets d'exemple générés pour la documentation.
+
+| Dashboard / Vue d'ensemble | Projects / Projets |
+|:---:|:---:|
+| ![Dashboard](docs/screenshots/02-dashboard.png) | ![Projects](docs/screenshots/03-projects.png) |
+
+| Project — overview / Détail projet | Backup detail / Détail sauvegarde |
+|:---:|:---:|
+| ![Project overview](docs/screenshots/04-project-detail.png) | ![Backup detail](docs/screenshots/05-backup-detail.png) |
+
+| Alerts / Alertes | Settings / Paramètres | Login / Connexion |
+|:---:|:---:|:---:|
+| ![Alerts](docs/screenshots/06-alerts.png) | ![Settings](docs/screenshots/07-settings.png) | ![Login](docs/screenshots/01-login.png) |
+
+<details>
+<summary><b>Project tabs / Onglets projet</b> — Sources, Planification, Historique, Informations</summary>
+
+| Sources | Planification |
+|:---:|:---:|
+| ![Project — sources](docs/screenshots/04b-project-sources.png) | ![Project — schedule](docs/screenshots/04c-project-schedule.png) |
+
+| Historique | Informations |
+|:---:|:---:|
+| ![Project — history](docs/screenshots/04d-project-history.png) | ![Project — info](docs/screenshots/04e-project-info.png) |
+
+</details>
+
+<details>
+<summary><b>Settings tabs / Onglets paramètres</b> — Notifications, Supervision, Sécurité, Configuration brute</summary>
+
+| Notifications (SMTP) | Supervision (Healthchecks.io) |
+|:---:|:---:|
+| ![Settings — notifications](docs/screenshots/07b-settings-notifications.png) | ![Settings — monitoring](docs/screenshots/07c-settings-monitoring.png) |
+
+| Sécurité | Configuration brute (.env) |
+|:---:|:---:|
+| ![Settings — security](docs/screenshots/07d-settings-security.png) | ![Settings — advanced](docs/screenshots/07e-settings-advanced.png) |
+
+</details>
+
 ## What is this?
 
 Sentinel is a small dashboard that orchestrates backups for projects you self-host. Tell it where your databases and asset folders are, set a cron schedule, and it produces zipped backups on disk that you can download or restore from a UI.
@@ -72,17 +114,24 @@ App on `http://localhost:8082`. Put it behind nginx / Caddy / Traefik with HTTPS
 
 ### Without Docker
 
+With PM2 (recommended — manages the process lifecycle, sets `NODE_ENV=production` automatically via `ecosystem.config.cjs`):
+
 ```bash
 npm install
 npm run build
-npm start
+pm2 start ecosystem.config.cjs   # first time only
+npm run prod                     # subsequent redeploys: install + build + pm2 reload
 ```
 
-Or with PM2 (config in `ecosystem.config.cjs`):
+Without PM2 (useful to test the built app locally):
 
 ```bash
-npm run prod
+npm install
+npm run build
+npm run start:prod
 ```
+
+`start:prod` runs the built server with `NODE_ENV=production` forced via `cross-env`, so the server serves the built front in addition to the API.
 
 ## Adding a backup, end to end
 
@@ -171,10 +220,10 @@ This project assumes **single-operator self-hosting behind a reverse proxy with 
 - One admin password (`ADMIN_PASSWORD`), no user accounts, no signup, no password recovery.
 - Source credentials encrypted at rest with AES-256-GCM. The key lives in `.env` on the host.
 - Login is rate-limited (5 attempts / 15 min per IP, then 15 min lockout).
-- JWT cookies are `secure` in production, `httpOnly`, `sameSite=strict`.
+- JWT cookies are `httpOnly`, `sameSite=strict`, and `secure` whenever the request is served over HTTPS (so they still work on a plain-HTTP LAN deployment).
 - See [SECURITY.md](./SECURITY.md) for the full threat model and how to report vulnerabilities.
 
-**Don't** expose the dev server (`npm run dev`) to the public internet — it has CORS open for `localhost:8081`. The production server (`npm start` / Docker) is fine to expose, behind HTTPS.
+**Don't** expose the dev server (`npm run dev` / `npm start`) to the public internet — it has CORS open for `localhost:8081`. The production server (`npm run prod` via PM2 / Docker) is fine to expose, behind HTTPS.
 
 ## Project status
 
@@ -258,8 +307,7 @@ Mot de passe par défaut : **`sentinel`** — à changer via `ADMIN_PASSWORD` da
 
 > Nécessite Node 22+ et npm 10+.
 
-## Produ
-> Nécessite Node 22+ et npm 10+.ction
+## Production
 
 ### Docker (recommandé)
 
@@ -272,17 +320,24 @@ App sur `http://localhost:8082`. À placer derrière nginx / Caddy / Traefik en 
 
 ### Sans Docker
 
+Avec PM2 (recommandé — gère le cycle de vie du process et set `NODE_ENV=production` automatiquement via `ecosystem.config.cjs`) :
+
 ```bash
 npm install
 npm run build
-npm start
+pm2 start ecosystem.config.cjs   # une seule fois
+npm run prod                     # redéploiements suivants : install + build + pm2 reload
 ```
 
-Ou avec PM2 (config dans `ecosystem.config.cjs`) :
+Sans PM2 (utile pour tester localement l'app buildée) :
 
 ```bash
-npm run prod
+npm install
+npm run build
+npm run start:prod
 ```
+
+`start:prod` lance le serveur buildé avec `NODE_ENV=production` forcé via `cross-env`, donc le serveur sert le front buildé en plus de l'API.
 
 ## Créer une sauvegarde, de A à Z
 
@@ -343,10 +398,10 @@ Ce projet est conçu pour **un usage self-hosted, opérateur unique, derrière u
 - Un seul mot de passe admin (`ADMIN_PASSWORD`), pas de comptes utilisateurs, pas d'inscription, pas de récupération.
 - Credentials des sources chiffrés au repos en AES-256-GCM. La clé vit dans `.env` sur la machine hôte.
 - Login rate-limité (5 tentatives / 15 min par IP, puis blocage 15 min).
-- Cookies JWT `secure` en production, `httpOnly`, `sameSite=strict`.
+- Cookies JWT `httpOnly`, `sameSite=strict`, et `secure` dès que la requête arrive en HTTPS (ils fonctionnent donc aussi en HTTP simple sur un LAN).
 - Voir [SECURITY.md](./SECURITY.md) pour le threat model complet et la procédure de divulgation.
 
-**N'exposez pas** le serveur de dev (`npm run dev`) sur internet — il a CORS ouvert pour `localhost:8081`. Le serveur de production (`npm start` / Docker) est fait pour être exposé, derrière HTTPS.
+**N'exposez pas** le serveur de dev (`npm run dev` / `npm start`) sur internet — il a CORS ouvert pour `localhost:8081`. Le serveur de production (`npm run prod` via PM2 / Docker) est fait pour être exposé, derrière HTTPS.
 
 ## État du projet
 

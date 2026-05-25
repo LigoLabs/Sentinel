@@ -24,6 +24,7 @@ export const ERROR_CODES = {
   'backup.not_found': { status: 404, message: 'Backup not found' },
   'backup.files_not_found': { status: 404, message: 'Backup files not found on disk' },
   'backup.restore_failed': { status: 500, message: 'Restore failed' },
+  'backup.already_running': { status: 409, message: 'A backup is already running for this project' },
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

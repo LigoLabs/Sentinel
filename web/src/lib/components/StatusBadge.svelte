@@ -21,7 +21,7 @@
 	const label = $derived(KEYS[status] ? i18n.t(KEYS[status]) : status);
 </script>
 
-<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium {styles[status] || 'bg-surface-700 text-surface-600'}">
+<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium {styles[status] || 'bg-border text-text-dim'}">
 	<span class="h-1.5 w-1.5 rounded-full {status === 'running' ? 'animate-pulse' : ''}"
 		style="background: currentColor;"></span>
 	{label}
