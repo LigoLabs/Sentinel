@@ -141,7 +141,9 @@ export class MysqlSshConnector implements DatabaseConnector {
       const baseArgs = `-h ${cfg.mysqlHost} -P ${cfg.mysqlPort} -u ${cfg.mysqlUser} ${pw}`;
 
       // Get table list
-      const tablesCmd = `mysql ${baseArgs} -N -e "SHOW TABLES" ${cfg.mysqlDatabase} 2>&1`;
+      // No 2>&1 on these queries: mysql prints the password warning on stderr, which would
+      // otherwise be parsed as a table name and break every row count.
+      const tablesCmd = `mysql ${baseArgs} -N -e "SHOW TABLES" ${cfg.mysqlDatabase}`;
       const tablesResult = await sshExec(conn, tablesCmd);
       if (tablesResult.code !== 0) {
         throw new Error(`Failed to list tables: ${tablesResult.stderr || tablesResult.stdout}`);
@@ -152,7 +154,7 @@ export class MysqlSshConnector implements DatabaseConnector {
       // Get row counts
       const tables: DumpResult['tables'] = [];
       for (const name of tableNames) {
-        const countCmd = `mysql ${baseArgs} -N -e "SELECT COUNT(*) FROM \\\`${name}\\\`" ${cfg.mysqlDatabase} 2>&1`;
+        const countCmd = `mysql ${baseArgs} -N -e "SELECT COUNT(*) FROM \\\`${name}\\\`" ${cfg.mysqlDatabase}`;
         const countResult = await sshExec(conn, countCmd);
         const rowCount = parseInt(countResult.stdout.trim(), 10) || 0;
         tables.push({ name, rowCount });
