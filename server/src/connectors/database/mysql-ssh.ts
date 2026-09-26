@@ -1,5 +1,5 @@
 import { Client } from 'ssh2';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { mkdirSync, createReadStream, createWriteStream, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseConnector, DumpResult } from './types.js';
 
@@ -73,6 +73,42 @@ function sshExec(conn: Client, command: string): Promise<{ stdout: string; stder
   });
 }
 
+// Streams stdout straight to disk: dumps can exceed V8's max string length (~512 MB),
+// so they must never be buffered into a single string.
+function sshExecToFile(conn: Client, command: string, filePath: string): Promise<{ code: number; stderr: string; sizeBytes: number }> {
+  return new Promise((resolve, reject) => {
+    conn.exec(command, (err, stream) => {
+      if (err) return reject(err);
+      const out = createWriteStream(filePath);
+      let stderr = '';
+      let code: number | null = null;
+      let closed = false;
+      let flushed = false;
+      const settle = () => {
+        if (closed && flushed) resolve({ code: code ?? -1, stderr, sizeBytes: out.bytesWritten });
+      };
+      stream.stderr.on('data', (data: Buffer) => {
+        if (stderr.length < 10_000) stderr += data.toString();
+      });
+      stream.on('close', (exitCode: number | null) => {
+        code = exitCode;
+        closed = true;
+        if (!out.writableEnded) out.end();
+        settle();
+      });
+      out.on('finish', () => {
+        flushed = true;
+        settle();
+      });
+      out.on('error', (e) => {
+        stream.destroy();
+        reject(e);
+      });
+      stream.pipe(out);
+    });
+  });
+}
+
 export class MysqlSshConnector implements DatabaseConnector {
   readonly type = 'mysql-ssh';
 
@@ -124,16 +160,17 @@ export class MysqlSshConnector implements DatabaseConnector {
       }
 
       // Full mysqldump
-      const dumpCmd = `mysqldump ${baseArgs} --single-transaction --routines --triggers --add-drop-table ${cfg.mysqlDatabase} 2>&1`;
+      // No 2>&1 here: stdout is the dump file itself, stderr (e.g. the password warning) must stay out of it.
+      const dumpCmd = `mysqldump ${baseArgs} --single-transaction --routines --triggers --add-drop-table ${cfg.mysqlDatabase}`;
+      const dumpPath = join(outputDir, `${cfg.mysqlDatabase}.sql`);
       logs.push('Running mysqldump...');
-      const dumpResult = await sshExec(conn, dumpCmd);
+      const dumpResult = await sshExecToFile(conn, dumpCmd, dumpPath);
       if (dumpResult.code !== 0) {
-        throw new Error(`mysqldump failed: ${dumpResult.stderr || dumpResult.stdout.slice(0, 500)}`);
+        rmSync(dumpPath, { force: true });
+        throw new Error(`mysqldump failed (exit ${dumpResult.code}): ${dumpResult.stderr.slice(0, 500)}`);
       }
 
-      const dumpPath = join(outputDir, `${cfg.mysqlDatabase}.sql`);
-      writeFileSync(dumpPath, dumpResult.stdout, 'utf8');
-      const sizeBytes = Buffer.byteLength(dumpResult.stdout, 'utf8');
+      const { sizeBytes } = dumpResult;
       logs.push(`Dump written: ${dumpPath} (${sizeBytes} bytes)`);
 
       return { tables, sizeBytes, logs };
@@ -143,13 +180,11 @@ export class MysqlSshConnector implements DatabaseConnector {
   }
 
   async restore(config: Record<string, unknown>, inputDir: string): Promise<void> {
-    const { readFileSync } = await import('node:fs');
     const cfg = parseConfig(config);
     const conn = await sshConnect(cfg);
 
     try {
       const dumpPath = join(inputDir, `${cfg.mysqlDatabase}.sql`);
-      const sql = readFileSync(dumpPath, 'utf8');
 
       const pw = cfg.mysqlPassword ? `-p'${cfg.mysqlPassword.replace(/'/g, "'\\''")}'` : '';
       const cmd = `mysql -h ${cfg.mysqlHost} -P ${cfg.mysqlPort} -u ${cfg.mysqlUser} ${pw} ${cfg.mysqlDatabase}`;
@@ -165,7 +200,7 @@ export class MysqlSshConnector implements DatabaseConnector {
             const msg = data.toString();
             if (msg.toLowerCase().includes('error')) reject(new Error(msg));
           });
-          stream.end(sql);
+          createReadStream(dumpPath).on('error', reject).pipe(stream);
         });
       });
     } finally {

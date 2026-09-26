@@ -1,5 +1,5 @@
 import { Client } from 'ssh2';
-import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, createReadStream, createWriteStream, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseConnector, DumpResult } from './types.js';
 
@@ -80,6 +80,42 @@ function sshExec(conn: Client, command: string): Promise<{ stdout: string; stder
   });
 }
 
+// Streams stdout straight to disk: dumps can exceed V8's max string length (~512 MB),
+// so they must never be buffered into a single string.
+function sshExecToFile(conn: Client, command: string, filePath: string): Promise<{ code: number; stderr: string; sizeBytes: number }> {
+  return new Promise((resolve, reject) => {
+    conn.exec(command, (err, stream) => {
+      if (err) return reject(err);
+      const out = createWriteStream(filePath);
+      let stderr = '';
+      let code: number | null = null;
+      let closed = false;
+      let flushed = false;
+      const settle = () => {
+        if (closed && flushed) resolve({ code: code ?? -1, stderr, sizeBytes: out.bytesWritten });
+      };
+      stream.stderr.on('data', (data: Buffer) => {
+        if (stderr.length < 10_000) stderr += data.toString();
+      });
+      stream.on('close', (exitCode: number | null) => {
+        code = exitCode;
+        closed = true;
+        if (!out.writableEnded) out.end();
+        settle();
+      });
+      out.on('finish', () => {
+        flushed = true;
+        settle();
+      });
+      out.on('error', (e) => {
+        stream.destroy();
+        reject(e);
+      });
+      stream.pipe(out);
+    });
+  });
+}
+
 export class PostgresSshConnector implements DatabaseConnector {
   readonly type = 'postgres-ssh';
 
@@ -128,16 +164,17 @@ export class PostgresSshConnector implements DatabaseConnector {
         logs.push(`  ${name}: ${rowCount} rows`);
       }
 
-      const dumpCmd = `${envPrefix(cfg)}pg_dump ${baseArgs} --no-owner --no-privileges --clean --if-exists 2>&1`;
+      // No 2>&1 here: stdout is the dump file itself, stderr must stay out of it.
+      const dumpCmd = `${envPrefix(cfg)}pg_dump ${baseArgs} --no-owner --no-privileges --clean --if-exists`;
+      const dumpPath = join(outputDir, `${cfg.pgDatabase}.sql`);
       logs.push('Running pg_dump...');
-      const dumpResult = await sshExec(conn, dumpCmd);
+      const dumpResult = await sshExecToFile(conn, dumpCmd, dumpPath);
       if (dumpResult.code !== 0) {
-        throw new Error(`pg_dump failed: ${dumpResult.stderr || dumpResult.stdout.slice(0, 500)}`);
+        rmSync(dumpPath, { force: true });
+        throw new Error(`pg_dump failed (exit ${dumpResult.code}): ${dumpResult.stderr.slice(0, 500)}`);
       }
 
-      const dumpPath = join(outputDir, `${cfg.pgDatabase}.sql`);
-      writeFileSync(dumpPath, dumpResult.stdout, 'utf8');
-      const sizeBytes = Buffer.byteLength(dumpResult.stdout, 'utf8');
+      const { sizeBytes } = dumpResult;
       logs.push(`Dump written: ${dumpPath} (${sizeBytes} bytes)`);
 
       return { tables, sizeBytes, logs };
@@ -152,7 +189,6 @@ export class PostgresSshConnector implements DatabaseConnector {
 
     try {
       const dumpPath = join(inputDir, `${cfg.pgDatabase}.sql`);
-      const sql = readFileSync(dumpPath, 'utf8');
 
       const cmd = `${envPrefix(cfg)}psql -h ${cfg.pgHost} -p ${cfg.pgPort} -U ${cfg.pgUser} -d ${cfg.pgDatabase} -w -v ON_ERROR_STOP=1`;
 
@@ -167,7 +203,7 @@ export class PostgresSshConnector implements DatabaseConnector {
           stream.stderr.on('data', (data: Buffer) => {
             stderr += data.toString();
           });
-          stream.end(sql);
+          createReadStream(dumpPath).on('error', reject).pipe(stream);
         });
       });
     } finally {
